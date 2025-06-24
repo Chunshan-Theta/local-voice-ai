@@ -17,9 +17,9 @@ RUN npm install
 # Copy Next.js source and build
 COPY pages ./pages
 COPY lib ./lib
-COPY next.config.js ./
-COPY tsconfig.json ./
-COPY next-env.d.ts ./
+COPY *.json ./
+COPY *.js ./
+COPY *.ts ./
 RUN npm run build
 
 # Copy Python service and install dependencies
