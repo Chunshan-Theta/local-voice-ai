@@ -10,10 +10,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 載入 Whisper 模型 - 使用 tiny 模型避免記憶體問題
-logger.info("Loading Whisper tiny model...")
-model = whisper.load_model("tiny")
-logger.info("Whisper tiny model loaded successfully!")
+# 載入 Whisper 模型 - 從環境變數讀取模型名稱
+WHISPER_MODEL = os.getenv('WHISPER_MODEL', 'small')
+logger.info(f"Loading Whisper {WHISPER_MODEL} model...")
+model = whisper.load_model(WHISPER_MODEL)
+logger.info(f"Whisper {WHISPER_MODEL} model loaded successfully!")
 
 app = Flask(__name__)
 CORS(app)
@@ -21,7 +22,7 @@ CORS(app)
 @app.route('/health', methods=['GET'])
 def health_check():
     """健康檢查端點"""
-    return jsonify({"status": "healthy", "model": "whisper-small", "language": "zh"})
+    return jsonify({"status": "healthy", "model": f"whisper-{WHISPER_MODEL}", "language": "zh"})
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe_audio():

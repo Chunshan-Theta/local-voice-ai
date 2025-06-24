@@ -24,8 +24,9 @@ COPY local_whisper_service.py ./
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download Whisper model
-RUN python -c "import whisper; whisper.load_model('tiny')"
+# Pre-download Whisper model (default: small)
+ARG WHISPER_MODEL=small
+RUN python -c "import whisper; whisper.load_model(\"$WHISPER_MODEL\")"
 
 # Copy startup script
 COPY docker-entrypoint.sh ./

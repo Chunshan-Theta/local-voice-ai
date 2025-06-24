@@ -27,18 +27,20 @@ docker build -t local-voice-ai .
 docker run -p 3000:3000 -p 5001:5001 -e OLLAMA_BASE_URL=https://site.ollama.lazyinwork.com local-voice-ai
 ```
 
-### 2. 自定義 Ollama 端點
+### 2. 自定義配置
 
 ```bash
 # 設置環境變數
 export OLLAMA_BASE_URL=https://your-ollama-endpoint.com
+export WHISPER_MODEL=medium  # 可選：tiny, base, small, medium, large
 
 # 使用 docker-compose
-OLLAMA_BASE_URL=https://your-ollama-endpoint.com docker-compose up --build
+OLLAMA_BASE_URL=https://your-ollama-endpoint.com WHISPER_MODEL=medium docker-compose up --build
 
 # 使用 Docker
 docker run -p 3000:3000 -p 5001:5001 \
   -e OLLAMA_BASE_URL=https://your-ollama-endpoint.com \
+  -e WHISPER_MODEL=medium \
   local-voice-ai
 ```
 
@@ -74,6 +76,7 @@ curl http://localhost:5001/health
 | 變數名 | 默認值 | 說明 |
 |--------|--------|------|
 | `OLLAMA_BASE_URL` | `https://site.ollama.lazyinwork.com` | Ollama API 端點 |
+| `WHISPER_MODEL` | `small` | Whisper 模型大小 (tiny/base/small/medium/large) |
 | `NODE_ENV` | `production` | Node.js 環境 |
 
 ## 故障排除

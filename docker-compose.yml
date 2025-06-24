@@ -9,6 +9,7 @@ services:
     environment:
       - NODE_ENV=production
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
     volumes:
       - ./tmp:/app/tmp  # For temporary audio files
     restart: unless-stopped
