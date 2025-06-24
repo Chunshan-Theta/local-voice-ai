@@ -3,6 +3,7 @@ import FormData from 'form-data';
 import fs from 'fs';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://site.ollama.lazyinwork.com';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:1b';
 const WHISPER_SERVICE_URL = 'http://localhost:5001';  // 修改端口
 
 export async function whisperWithOllama(audioFilePath: string): Promise<string> {
@@ -62,7 +63,7 @@ export async function chatWithOllama(prompt: string): Promise<string> {
   
   try {
     const response = await axios.post(`${OLLAMA_BASE_URL}/api/generate`, {
-      model: 'gemma3:4b',
+      model: OLLAMA_MODEL,
       prompt: prompt,
       stream: false
     }, {
