@@ -33,8 +33,8 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
     const result = response.data;
     console.log('Whisper response:', result);
 
-    if (result.transcript) {
-      return result.transcript;
+    if (result.transcript !== undefined) {
+      return result.transcript || ''; // 返回空字符串而不是拋出錯誤
     } else {
       throw new Error('未收到辨識結果');
     }

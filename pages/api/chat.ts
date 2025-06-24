@@ -39,7 +39,23 @@ export default async function handler(
     const transcript = await whisperWithOllama(audioFile.filepath);
     
     if (!transcript.trim()) {
-      return res.status(400).json({ error: '語音辨識無結果' });
+      // 對於空轉錄結果，回覆提示訊息而不是錯誤
+      const reply = "抱歉，我沒有聽清楚您說的話，請重新錄製語音。";
+      
+      // 清理臨時文件
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(audioFile.filepath)) {
+          fs.unlinkSync(audioFile.filepath);
+        }
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup temporary file:', cleanupError);
+      }
+      
+      return res.status(200).json({ 
+        transcript: "（未識別到語音）", 
+        reply 
+      });
     }
 
     // AI 聊天回覆
