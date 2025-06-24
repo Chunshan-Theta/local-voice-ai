@@ -15,7 +15,7 @@ export default function Home() {
   
   // 環境音檢測相關狀態
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [baselineNoise, setBaselineNoise] = useState<number>(20);
+  const [baselineNoise, setBaselineNoise] = useState<number>(10);
   const [currentVolume, setCurrentVolume] = useState<number>(0);
   const [calibrationProgress, setCalibrationProgress] = useState<number>(0);
   const [hasDetectedVoice, setHasDetectedVoice] = useState(false);
@@ -34,15 +34,16 @@ export default function Home() {
   const MIN_RECORDING_TIME = 1000; // 最短錄音時間 1秒
   const CALIBRATION_DURATION = 3000; // 3秒校準時間
 
-  // 計算動態閾值
-  const getSilenceThreshold = () => baselineNoise + 1; // 進一步降低
-  const getVoiceThreshold = () => baselineNoise + 3;   // 大幅降低語音閾值
-
   // 新增：持續的音頻流管理
   const audioStreamRef = useRef<MediaStream | null>(null);
 
   const isListeningRef = useRef(false);
   const hasDetectedVoiceRef = useRef(false);
+  const baselineNoiseRef = useRef(10);
+
+  // 計算動態閾值 - 使用 ref 確保最新值
+  const getSilenceThreshold = () => baselineNoiseRef.current + 0.5; // 進一步降低
+  const getVoiceThreshold = () => baselineNoiseRef.current + 1;   // 大幅降低語音閾值，只需比環境音高1即可
 
   // 當有新的 AI 回應時，自動重新開始錄音
   useEffect(() => {
@@ -140,7 +141,8 @@ export default function Home() {
           const baseline = Math.max(mean, 10);
           
           setBaselineNoise(baseline);
-          console.log(`✅ 環境音校準完成: ${baseline.toFixed(1)} (使用統一音軌)`);
+          baselineNoiseRef.current = baseline; // 同時更新 ref
+          console.log(`✅ 環境音校準完成: ${baseline.toFixed(1)} (使用統一音軌)，語音閾值: ${(baseline + 1).toFixed(1)}`);
           
           setIsCalibrating(false);
           setCurrentVolume(0);
@@ -223,6 +225,8 @@ export default function Home() {
   };
 
   const stopListening = () => {
+    console.log('🛑 stopListening 被調用');
+    
     setIsListening(false);
     isListeningRef.current = false;
     setCurrentVolume(0);
@@ -232,6 +236,7 @@ export default function Home() {
     stopVolumeMonitoring();
     
     if (silenceTimerRef.current) {
+      console.log('🕐 清理靜音計時器:', silenceTimerRef.current);
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
@@ -241,9 +246,15 @@ export default function Home() {
   };
 
   const stopRecording = () => {
+    console.log('🎬 stopRecording 被調用');
+    
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      console.log('📹 停止 MediaRecorder');
       mediaRecorderRef.current.stop();
+    } else {
+      console.log('⚠️ MediaRecorder 不在錄音狀態:', mediaRecorderRef.current?.state);
     }
+    
     stopListening();
   };
 
@@ -378,29 +389,81 @@ export default function Home() {
         console.log(`🔊 第${checkCount}次檢查: 平均=${average.toFixed(1)}, 最大=${maxValue.toFixed(1)}, 語音閾值=${voiceThreshold}`);
         console.log(`📊 音頻狀態: 上下文=${audioContextState}, 流活躍=${streamActive}, 監聽中=${currentIsListening}`);
         console.log(`📈 音頻數據樣本前5個:`, Array.from(dataArray.slice(0, 5)));
+        console.log(`🎯 閾值檢查: baselineNoiseRef=${baselineNoiseRef.current}, baselineNoise state=${baselineNoise}, 計算的語音閾值=${voiceThreshold}`);
       }
       
-      // 語音檢測邏輯
-      const isVoiceDetected = average >= voiceThreshold || maxValue >= voiceThreshold * 1.2;
+      // 語音檢測邏輯 - 只依賴平均值，忽略最大值波動
+      const isVoiceDetected = average >= voiceThreshold; // 只使用平均值檢測
+      
+      // 每次都記錄語音檢測結果（用於調試）
+      if (checkCount % 5 === 0) { // 每500ms記錄一次
+        console.log('🔍 語音檢測詳情:', {
+          average: average.toFixed(1),
+          maxValue: maxValue.toFixed(1),
+          voiceThreshold: voiceThreshold.toFixed(1),
+          isVoiceDetectedByAverage: average >= voiceThreshold,
+          isVoiceDetected,
+          hasDetectedVoiceBefore: hasDetectedVoiceRef.current,
+          checkCount
+        });
+      }
       
       if (isVoiceDetected) {
         if (!hasDetectedVoiceRef.current) {
-          console.log('🟢 檢測到語音！', { average: average.toFixed(1), max: maxValue.toFixed(1) });
+          console.log('🟢 檢測到語音！', { 
+            average: average.toFixed(1), 
+            max: maxValue.toFixed(1),
+            trigger: average >= voiceThreshold ? 'average' : 'maxValue'
+          });
           setHasDetectedVoice(true);
           hasDetectedVoiceRef.current = true;
         }
         
+        // 清除靜音計時器
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = null;
+          console.log('🔄 檢測到語音，取消靜音倒數');
         }
-      } else if (average < silenceThreshold && hasDetectedVoiceRef.current) {
+      } else if (hasDetectedVoiceRef.current) {
+        // 修改：只要檢測到語音後，音量低於語音閾值就開始靜音倒數
         if (!silenceTimerRef.current) {
-          console.log('🔴 開始靜音倒數...');
+          console.log('🔴 開始靜音倒數...', { 
+            currentVolume: average.toFixed(1), 
+            voiceThreshold: voiceThreshold.toFixed(1),
+            silenceThreshold: silenceThreshold.toFixed(1),
+            checkCount,
+            timestamp: new Date().toISOString()
+          });
+          
           silenceTimerRef.current = setTimeout(() => {
-            console.log('⏰ 靜音時間到，自動發送錄音');
-            stopRecording();
+            console.log('⏰ 靜音時間到，準備自動發送錄音', {
+              timestamp: new Date().toISOString(),
+              isListening: isListeningRef.current,
+              mediaRecorderState: mediaRecorderRef.current?.state
+            });
+            
+            // 確保在執行前清理計時器引用
+            silenceTimerRef.current = null;
+            
+            try {
+              stopRecording();
+              console.log('✅ stopRecording 執行完成');
+            } catch (error) {
+              console.error('❌ stopRecording 執行錯誤:', error);
+            }
           }, SILENCE_DURATION);
+          
+          console.log('🕐 靜音計時器已設置，ID:', silenceTimerRef.current);
+        } else {
+          // 每秒打印一次計時器狀態
+          if (checkCount % 10 === 0) {
+            console.log('⏳ 靜音計時器運行中...', {
+              timerId: silenceTimerRef.current,
+              remainingTime: `約 ${Math.ceil((SILENCE_DURATION - ((checkCount % 30) * 100)) / 1000)}秒`,
+              checkCount
+            });
+          }
         }
       }
     }, 100);
