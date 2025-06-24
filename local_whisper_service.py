@@ -10,10 +10,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 載入 Whisper 模型 - 使用 small 模型以獲得最佳中文辨識準確度
-logger.info("Loading Whisper small model...")
-model = whisper.load_model("small")
-logger.info("Whisper small model loaded successfully!")
+# 載入 Whisper 模型 - 使用 tiny 模型避免記憶體問題
+logger.info("Loading Whisper tiny model...")
+model = whisper.load_model("tiny")
+logger.info("Whisper tiny model loaded successfully!")
 
 app = Flask(__name__)
 CORS(app)

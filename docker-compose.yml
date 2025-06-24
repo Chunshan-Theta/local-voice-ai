@@ -1,28 +1,20 @@
-version: '3.8'
-
 services:
-  whisper-service:
-    build: 
-      context: ./whisper-service
-      dockerfile: Dockerfile
+  voice-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile.minimal
     ports:
-      - "5001:5000"
-    volumes:
-      # 掛載模型快取目錄以持久化模型檔案
-      - whisper_models:/root/.cache/whisper
-      # 掛載臨時檔案目錄
-      - ./tmp:/tmp/uploads
+      - "3000:3000"   # Next.js frontend
+      - "5001:5001"   # Whisper service
     environment:
-      - FLASK_ENV=development
-      - PYTHONUNBUFFERED=1
+      - NODE_ENV=production
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+    volumes:
+      - ./tmp:/app/tmp  # For temporary audio files
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health", "&&", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
-    restart: unless-stopped
-    
-volumes:
-  whisper_models:
-    driver: local 
+      start_period: 60s 
