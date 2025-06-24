@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  whisper-service:
+    build: 
+      context: ./whisper-service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"
+    volumes:
+      # 掛載模型快取目錄以持久化模型檔案
+      - whisper_models:/root/.cache/whisper
+      # 掛載臨時檔案目錄
+      - ./tmp:/tmp/uploads
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    
+volumes:
+  whisper_models:
+    driver: local 
