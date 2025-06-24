@@ -2,7 +2,6 @@ services:
   voice-ai:
     build:
       context: .
-      dockerfile: Dockerfile.minimal
     ports:
       - "3000:3000"   # Next.js frontend
       - "5001:5001"   # Whisper service

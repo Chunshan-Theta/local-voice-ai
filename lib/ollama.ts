@@ -9,6 +9,11 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
   console.log('Processing audio file with local Python Whisper service:', audioFilePath);
   
   try {
+    // 檢查文件是否存在
+    if (!fs.existsSync(audioFilePath)) {
+      throw new Error(`音頻文件不存在: ${audioFilePath}`);
+    }
+
     const formData = new FormData();
     const audioBuffer = fs.readFileSync(audioFilePath);
     formData.append('audio', audioBuffer, {

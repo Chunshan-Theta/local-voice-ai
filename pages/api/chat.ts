@@ -23,7 +23,7 @@ export default async function handler(
 
   try {
     const form = formidable({
-      uploadDir: './tmp',
+      uploadDir: '/app/tmp',
       keepExtensions: true,
       maxFileSize: 10 * 1024 * 1024, // 10MB
     });
@@ -52,6 +52,26 @@ export default async function handler(
 
   } catch (error) {
     console.error('API error:', error);
+    
+    // 清理臨時文件 (在錯誤情況下也要清理)
+    try {
+      const form = formidable({
+        uploadDir: '/app/tmp',
+        keepExtensions: true,
+      });
+      const [, files] = await form.parse(req);
+      const audioFile = Array.isArray(files.audio) ? files.audio[0] : files.audio;
+      
+      if (audioFile && audioFile.filepath) {
+        const fs = require('fs');
+        if (fs.existsSync(audioFile.filepath)) {
+          fs.unlinkSync(audioFile.filepath);
+        }
+      }
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup temporary file in error handler:', cleanupError);
+    }
+    
     res.status(500).json({ 
       error: error instanceof Error ? error.message : '伺服器錯誤' 
     });

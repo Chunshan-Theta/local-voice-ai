@@ -1,60 +1,42 @@
-# Multi-stage build for Next.js + Python Whisper service
-FROM node:18-alpine AS nextjs-builder
+# Use official Python image with Node.js pre-installed
+FROM nikolaik/python-nodejs:python3.9-nodejs18
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-# Python runtime with Whisper
-FROM python:3.9-slim
-
-# Fix GPG and install system dependencies
-RUN apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get update --allow-releaseinfo-change && \
-    apt-get install -y --no-install-recommends \
-    ffmpeg \
-    curl \
-    gnupg2 \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js for Next.js
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get update && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Install ffmpeg (required by Whisper)
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy Next.js build from builder stage
-COPY --from=nextjs-builder /app/.next ./.next
-COPY --from=nextjs-builder /app/node_modules ./node_modules
-COPY --from=nextjs-builder /app/package*.json ./
-COPY --from=nextjs-builder /app/next.config.js ./
-COPY --from=nextjs-builder /app/pages ./pages
-COPY --from=nextjs-builder /app/lib ./lib
+# Create tmp directory for temporary files
+RUN mkdir -p /app/tmp && chmod 777 /app/tmp
 
-# Copy Python Whisper service
+# Copy and install Node.js dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy Next.js source and build
+COPY pages ./pages
+COPY lib ./lib
+COPY next.config.js ./
+COPY tsconfig.json ./
+COPY next-env.d.ts ./
+RUN npm run build
+
+# Copy Python service and install dependencies
 COPY local_whisper_service.py ./
 COPY requirements.txt ./
-
-# Install Python dependencies and download Whisper model
 RUN pip install --no-cache-dir -r requirements.txt
-RUN python -c "import whisper; whisper.load_model('small')"
 
-# Create startup script
+# Pre-download Whisper model (default: small)
+ARG WHISPER_MODEL=small
+RUN python -c "import whisper; whisper.load_model(\"$WHISPER_MODEL\")"
+
+# Copy startup script
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
 # Expose ports
 EXPOSE 3000 5001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
-  CMD curl -f http://localhost:3000/api/health && curl -f http://localhost:5001/health || exit 1
 
 # Start both services
 CMD ["./docker-entrypoint.sh"] 
