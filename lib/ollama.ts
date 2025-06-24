@@ -21,7 +21,7 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
       contentType: 'audio/wav'
     });
 
-    const response = await axios.post('http://localhost:5001/transcribe', formData, {
+    const response = await axios.post('http://127.0.0.1:5001/transcribe', formData, {
       headers: {
         ...formData.getHeaders(),
       },
