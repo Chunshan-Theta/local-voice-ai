@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import { whisperWithOllama, chatWithOllama } from '../../lib/ollama';
+import fs from 'fs';
+import path from 'path';
 
 export const config = {
   api: {
@@ -22,8 +24,14 @@ export default async function handler(
   }
 
   try {
+    // 確保 tmp 目錄存在
+    const uploadDir = './tmp';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
     const form = formidable({
-      uploadDir: '/app/tmp',
+      uploadDir,
       keepExtensions: true,
       maxFileSize: 10 * 1024 * 1024, // 10MB
     });
@@ -44,7 +52,6 @@ export default async function handler(
       
       // 清理臨時文件
       try {
-        const fs = require('fs');
         if (fs.existsSync(audioFile.filepath)) {
           fs.unlinkSync(audioFile.filepath);
         }
@@ -71,15 +78,19 @@ export default async function handler(
     
     // 清理臨時文件 (在錯誤情況下也要清理)
     try {
+      const uploadDir = './tmp';
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
       const form = formidable({
-        uploadDir: '/app/tmp',
+        uploadDir,
         keepExtensions: true,
       });
       const [, files] = await form.parse(req);
       const audioFile = Array.isArray(files.audio) ? files.audio[0] : files.audio;
       
       if (audioFile && audioFile.filepath) {
-        const fs = require('fs');
         if (fs.existsSync(audioFile.filepath)) {
           fs.unlinkSync(audioFile.filepath);
         }
