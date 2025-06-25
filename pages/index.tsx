@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
-interface ChatResult {
-  transcript: string;
-  reply: string;
+interface Message {
+  id: string;
+  type: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  isLoading?: boolean;
 }
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false);
-  const [result, setResult] = useState<ChatResult | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationStarted, setConversationStarted] = useState(false);
@@ -40,6 +43,7 @@ export default function Home() {
   const isListeningRef = useRef(false);
   const hasDetectedVoiceRef = useRef(false);
   const baselineNoiseRef = useRef(10);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 計算動態閾值 - 使用 ref 確保最新值
   const getSilenceThreshold = () => baselineNoiseRef.current + 0.5; // 進一步降低
@@ -47,14 +51,31 @@ export default function Home() {
 
   // 當有新的 AI 回應時，自動重新開始錄音
   useEffect(() => {
-    if (result && conversationStarted && !loading && !isListening) {
-      const timer = setTimeout(() => {
-        startListening();
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+    if (messages.length > 0 && conversationStarted && !loading && !isListening) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.type === 'ai' && !lastMessage.isLoading) {
+        const timer = setTimeout(() => {
+          // 雙重檢查對話狀態
+          if (conversationStarted && !loading && !isListening) {
+            console.log('🔄 AI 回覆完成，自動重新開始錄音');
+            startListening();
+          } else {
+            console.log('⚠️ 對話狀態已改變，取消自動錄音');
+          }
+        }, 1000);
+        
+        return () => {
+          clearTimeout(timer);
+          console.log('🗑️ 清理自動錄音計時器');
+        };
+      }
     }
-  }, [result, conversationStarted, loading, isListening]);
+  }, [messages, conversationStarted, loading, isListening]);
+
+  // 自動滾動到最新消息
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // 創建持續的音頻流 - 校準和錄音共用
   const createAudioStream = async () => {
@@ -259,26 +280,85 @@ export default function Home() {
   };
 
   const endConversation = () => {
-    setConversationStarted(false);
-    stopRecording();
-    setResult(null);
+    console.log('🛑 endConversation 被調用 - 開始清理所有資源');
     
-    // 對話結束時才真正關閉所有音頻資源
+    // 立即停止所有狀態
+    setConversationStarted(false);
+    setIsListening(false);
+    setLoading(false);
+    setError(null);
+    setMessages([]);
+    setHasDetectedVoice(false);
+    setCurrentVolume(0);
+    
+    // 更新 refs
+    isListeningRef.current = false;
+    hasDetectedVoiceRef.current = false;
+    
+    // 強制停止錄音
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === 'recording') {
+          console.log('🎬 強制停止 MediaRecorder');
+          mediaRecorderRef.current.stop();
+        }
+      } catch (error) {
+        console.warn('停止錄音時出錯:', error);
+      }
+      mediaRecorderRef.current = null;
+    }
+    
+    // 清理所有定時器
+    if (silenceTimerRef.current) {
+      console.log('🕐 清理靜音計時器');
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    
+    if (volumeCheckIntervalRef.current) {
+      console.log('🔊 清理音量監控定時器');
+      clearInterval(volumeCheckIntervalRef.current);
+      volumeCheckIntervalRef.current = null;
+    }
+    
+    // 清理音頻資源
     if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      console.log('🎤 關閉音頻流');
+      audioStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('🛑 停止音軌:', track.kind);
+      });
       audioStreamRef.current = null;
     }
     
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
     
-    // 清理引用
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      console.log('🔊 關閉音頻上下文');
+      audioContextRef.current.close().then(() => {
+        console.log('✅ 音頻上下文已關閉');
+      }).catch(error => {
+        console.warn('關閉音頻上下文時出錯:', error);
+      });
+    }
+    
+    // 清理所有引用
     analyserRef.current = null;
     audioContextRef.current = null;
     streamRef.current = null;
+    audioChunksRef.current = [];
+    calibrationDataRef.current = [];
     
-    console.log('🛑 對話結束，所有音頻資源已清理');
+    // 重置校準相關狀態
+    setIsCalibrating(false);
+    setCalibrationProgress(0);
+    setBaselineNoise(10);
+    baselineNoiseRef.current = 10;
+    
+    console.log('✅ 對話結束，所有資源已清理，回到初始狀態');
   };
 
   const startConversation = async () => {
@@ -289,6 +369,12 @@ export default function Home() {
   };
 
   const processAudio = async () => {
+    // 檢查對話是否仍在進行中
+    if (!conversationStarted) {
+      console.log('⚠️ 對話已結束，取消音頻處理');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
@@ -300,22 +386,107 @@ export default function Home() {
         return;
       }
 
+      // 再次檢查對話狀態（防止在異步操作期間對話被結束）
+      if (!conversationStarted) {
+        console.log('⚠️ 對話在處理過程中被結束，取消操作');
+        setLoading(false);
+        return;
+      }
+
+      // 先添加一個用戶消息（loading狀態）
+      const userMessageId = `user_${Date.now()}`;
+      const userMessage: Message = {
+        id: userMessageId,
+        type: 'user',
+        content: '正在轉錄語音...',
+        timestamp: new Date(),
+        isLoading: true,
+      };
+      setMessages(prev => [...prev, userMessage]);
+
+      // 步驟1：語音轉錄
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.webm');
 
-      const response = await axios.post('/api/chat', formData, {
+      const transcribeResponse = await axios.post('/api/transcribe', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
+      });
+
+      const { transcript } = transcribeResponse.data;
+
+      // 檢查對話是否仍在進行（轉錄完成後）
+      if (!conversationStarted) {
+        console.log('⚠️ 對話在轉錄過程中被結束，取消後續操作');
+        setLoading(false);
+        return;
+      }
+
+      // 更新用戶消息的轉錄結果
+      setMessages(prev => prev.map(msg => 
+        msg.id === userMessageId 
+          ? { ...msg, content: transcript, isLoading: false }
+          : msg
+      ));
+
+      // 如果轉錄結果為空，不進行AI回覆
+      if (!transcript.trim() || transcript === '（未識別到語音）') {
+        setLoading(false);
+        return;
+      }
+
+      // 步驟2：添加AI回覆消息（loading狀態）
+      const aiMessageId = `ai_${Date.now()}`;
+      const aiMessage: Message = {
+        id: aiMessageId,
+        type: 'ai',
+        content: '正在思考回覆...',
+        timestamp: new Date(),
+        isLoading: true,
+      };
+      setMessages(prev => [...prev, aiMessage]);
+
+      // 再次檢查對話狀態（開始AI回覆前）
+      if (!conversationStarted) {
+        console.log('⚠️ 對話在AI回覆前被結束，取消操作');
+        setLoading(false);
+        return;
+      }
+
+      // 步驟3：獲取AI回覆
+      const replyResponse = await axios.post('/api/reply', {
+        message: transcript,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
         },
         timeout: 60000,
       });
 
-      const { transcript, reply } = response.data;
-      setResult({ transcript, reply });
+      const { reply } = replyResponse.data;
+
+      // 最終檢查對話狀態（AI回覆完成後）
+      if (!conversationStarted) {
+        console.log('⚠️ 對話在AI回覆過程中被結束，取消更新');
+        setLoading(false);
+        return;
+      }
+
+      // 更新AI消息的回覆結果
+      setMessages(prev => prev.map(msg => 
+        msg.id === aiMessageId 
+          ? { ...msg, content: reply, isLoading: false }
+          : msg
+      ));
 
     } catch (err) {
       console.error('處理錯誤:', err);
       setError(err instanceof Error ? err.message : '處理失敗');
+      
+      // 移除loading中的消息
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
     } finally {
       setLoading(false);
     }
@@ -478,15 +649,29 @@ export default function Home() {
     }
   };
 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('zh-TW', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100vh', 
+      maxWidth: '800px', 
+      margin: '0 auto',
+      padding: '1rem'
+    }}>
       <h1>本地語音 AI 助手</h1>
-      <p style={{ color: '#666', marginBottom: '2rem' }}>
+      <p style={{ color: '#666', marginBottom: '1rem' }}>
         自動校準環境音，智慧檢測語音活動。AI 回應後會自動重新開始錄音。
       </p>
       
       {/* 音量監控 */}
-      <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+      <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span style={{ fontSize: '0.9rem', color: '#666' }}>音量監控</span>
           <span style={{ fontSize: '0.8rem', color: '#666' }}>
@@ -517,7 +702,8 @@ export default function Home() {
         )}
       </div>
       
-      <div style={{ marginBottom: '2rem' }}>
+      {/* 控制按鈕 */}
+      <div style={{ marginBottom: '1rem' }}>
         {isCalibrating ? (
           <div style={{ textAlign: 'center' }}>
             <button
@@ -595,22 +781,6 @@ export default function Home() {
             >
               🛑 結束對話
             </button>
-
-            <button
-              onClick={calibrateEnvironmentalNoise}
-              disabled={isListening || loading}
-              style={{
-                padding: '1rem 1.5rem',
-                fontSize: '1rem',
-                backgroundColor: '#ffc107',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: (isListening || loading) ? 'not-allowed' : 'pointer',
-              }}
-            >
-              🔧 重新校準
-            </button>
           </div>
         )}
         
@@ -656,30 +826,70 @@ export default function Home() {
         </div>
       )}
 
-      {result && (
-        <div style={{ marginTop: '2rem' }}>
-          <div style={{
-            padding: '1rem',
-            backgroundColor: '#d4edda',
-            borderRadius: '4px',
-            marginBottom: '1rem'
+      {/* 聊天記錄區域 */}
+      <div style={{ 
+        flex: 1, 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '8px', 
+        padding: '1rem', 
+        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        {messages.length === 0 && conversationStarted && (
+          <div style={{ 
+            textAlign: 'center', 
+            color: '#666', 
+            fontStyle: 'italic',
+            marginTop: '2rem'
           }}>
-            <h3>🗣️ 你說的話：</h3>
-            <p style={{ fontSize: '1.1rem', margin: '0.5rem 0' }}>{result.transcript}</p>
+            🎤 開始說話來進行對話...
           </div>
-          
-          <div style={{
-            padding: '1rem',
-            backgroundColor: '#d1ecf1',
-            borderRadius: '4px'
-          }}>
-            <h3>🤖 AI 回覆：</h3>
-            <p style={{ fontSize: '1.1rem', margin: '0.5rem 0' }}>{result.reply}</p>
-          </div>
-        </div>
-      )}
+        )}
 
-      <div style={{ marginTop: '3rem', fontSize: '0.9rem', color: '#666' }}>
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            style={{
+              display: 'flex',
+              justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
+              marginBottom: '1rem'
+            }}
+          >
+            <div
+              style={{
+                maxWidth: '70%',
+                padding: '1rem',
+                borderRadius: '12px',
+                backgroundColor: message.type === 'user' ? '#007bff' : '#e9ecef',
+                color: message.type === 'user' ? 'white' : '#333',
+                position: 'relative',
+                opacity: message.isLoading ? 0.7 : 1,
+              }}
+            >
+              <div style={{ 
+                fontSize: '0.8rem', 
+                opacity: 0.8, 
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span>{message.type === 'user' ? '🗣️ 你' : '🤖 AI'}</span>
+                <span>{formatTime(message.timestamp)}</span>
+                {message.isLoading && <span>⏳</span>}
+              </div>
+              <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>
+                {message.content}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
         <p>✅ 智慧環境音校準，可靠的音量檢測</p>
         <p>✅ 使用 Whisper Small 模型進行中文語音辨識</p>
         <p>✅ 連接到 Gemma3:4b 模型生成回覆</p>
