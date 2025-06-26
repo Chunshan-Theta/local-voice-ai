@@ -72,4 +72,4 @@ def transcribe_audio():
 
 if __name__ == '__main__':
     # 使用生產配置
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, use_reloader=False) 
+    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True, use_reloader=False) 

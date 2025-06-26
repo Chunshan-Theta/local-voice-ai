@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
-import { whisperWithOllama, chatWithOllama } from '../../lib/ollama';
+import { whisperWithOllama } from '../../lib/ollama';
 import fs from 'fs';
-import path from 'path';
 
 export const config = {
   api: {
@@ -10,14 +9,13 @@ export const config = {
   },
 };
 
-interface ChatResponse {
+interface TranscribeResponse {
   transcript: string;
-  reply: string;
 }
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<ChatResponse | { error: string }>
+  res: NextApiResponse<TranscribeResponse | { error: string }>
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: '只支援 POST 方法' });
@@ -46,35 +44,27 @@ export default async function handler(
     // 語音辨識
     const transcript = await whisperWithOllama(audioFile.filepath);
     
-    if (!transcript.trim()) {
-      // 對於空轉錄結果，回覆提示訊息而不是錯誤
-      const reply = "抱歉，我沒有聽清楚您說的話，請重新錄製語音。";
-      
-      // 清理臨時文件
-      try {
-        if (fs.existsSync(audioFile.filepath)) {
-          fs.unlinkSync(audioFile.filepath);
-        }
-      } catch (cleanupError) {
-        console.warn('Failed to cleanup temporary file:', cleanupError);
+    // 清理臨時文件
+    try {
+      if (fs.existsSync(audioFile.filepath)) {
+        fs.unlinkSync(audioFile.filepath);
       }
-      
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup temporary file:', cleanupError);
+    }
+    
+    if (!transcript.trim()) {
       return res.status(200).json({ 
-        transcript: "（未識別到語音）", 
-        reply 
+        transcript: "（未識別到語音）"
       });
     }
 
-    // AI 聊天回覆
-    const reply = await chatWithOllama(transcript);
-
     res.status(200).json({
       transcript,
-      reply,
     });
 
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Transcribe API error:', error);
     
     // 清理臨時文件 (在錯誤情況下也要清理)
     try {
@@ -100,7 +90,7 @@ export default async function handler(
     }
     
     res.status(500).json({ 
-      error: error instanceof Error ? error.message : '伺服器錯誤' 
+      error: error instanceof Error ? error.message : '語音轉錄錯誤' 
     });
   }
 } 
