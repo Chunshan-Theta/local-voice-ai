@@ -24,6 +24,7 @@ def health_check():
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe_audio():
+    logger.info("Transcribing Request Received")
     """語音辨識端點"""
     temp_filename = None
     try:

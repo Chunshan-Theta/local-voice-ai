@@ -18,14 +18,16 @@ COPY lib ./lib
 COPY *.json ./
 COPY *.js ./
 COPY *.ts ./
+
+# Build the application
 RUN npm run build
 
 # Copy startup script
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
-# Expose ports
-EXPOSE 3000 5001
+# Expose port
+EXPOSE 3000
 
-# Start both services
+# Start the application
 CMD ["./docker-entrypoint.sh"] 
