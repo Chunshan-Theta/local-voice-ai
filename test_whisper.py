@@ -46,7 +46,7 @@ def test_whisper_service():
         with open(audio_file_path, 'rb') as audio_file:
             files = {'audio': ('test.wav', audio_file, 'audio/wav')}
             response = requests.post(
-                'http://localhost:5001/transcribe', 
+                'http://localhost/api/transcribe', 
                 files=files, 
                 timeout=60  # 1 分鐘超時
             )
