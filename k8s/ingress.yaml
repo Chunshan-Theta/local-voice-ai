@@ -23,4 +23,11 @@ spec:
           service:
             name: whisper-service
             port:
-              number: 5001 
+              number: 5001
+      - path: /tts
+        pathType: Prefix
+        backend:
+          service:
+            name: breezyvoice
+            port:
+              number: 8080 
