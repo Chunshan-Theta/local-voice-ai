@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voice-ai-config
+data:
+  OLLAMA_BASE_URL: "https://site.ollama.lazyinwork.com"
+  OLLAMA_MODEL: "gemma3:4b"
+  WHISPER_MODEL: "small" 

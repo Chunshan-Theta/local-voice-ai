@@ -1,35 +1,37 @@
-# 使用官方 Python 映像作為基礎
+# Use official Python image as base
 FROM python:3.9-slim
 
-# 安裝系統依賴 (包含 ffmpeg)
+# Install system dependencies (including ffmpeg)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 設置工作目錄
+# Set working directory
 WORKDIR /app
 
-# 複製需求檔案並安裝 Python 依賴
+# Copy requirements file and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 複製應用程式檔案
+# Copy application files
 COPY app.py .
 
-# 預下載 Whisper 模型
-RUN python -c "import whisper; whisper.load_model('tiny')"
-
-# 創建必要的目錄
+# Create necessary directories
+RUN mkdir -p /app/tmp && chmod 777 /app/tmp
 RUN mkdir -p /root/.cache/whisper
 
-# 暴露端口
-EXPOSE 5000
+# Pre-download Whisper model
+ARG WHISPER_MODEL=small
+RUN python -c "import whisper; whisper.load_model('${WHISPER_MODEL}')"
 
-# 健康檢查
+# Expose port
+EXPOSE 5001
+
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD curl -f http://localhost:5001/health || exit 1
 
-# 使用 gunicorn 啟動應用，大幅增加超時時間
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "300", "--worker-connections", "1000", "--preload", "app:app"] 
+# Use gunicorn to run the app
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "1", "--timeout", "300", "--worker-connections", "1000", "--preload", "app:app"] 

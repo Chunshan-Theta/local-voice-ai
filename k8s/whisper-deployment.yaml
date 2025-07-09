@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-service
+  labels:
+    app: whisper-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisper-service
+  template:
+    metadata:
+      labels:
+        app: whisper-service
+    spec:
+      containers:
+      - name: whisper-service
+        image: local-voice-ai-whisper:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+        env:
+        - name: WHISPER_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: voice-ai-config
+              key: WHISPER_MODEL
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /app/tmp
+      volumes:
+      - name: tmp-volume
+        emptyDir: {} 

@@ -4,15 +4,15 @@ import fs from 'fs';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://site.ollama.lazyinwork.com';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:1b';
-const WHISPER_SERVICE_URL = 'http://localhost:5001';  // 修改端口
+const WHISPER_SERVICE_URL = process.env.WHISPER_SERVICE_URL || 'http://whisper-service:5001';
 
 export async function whisperWithOllama(audioFilePath: string): Promise<string> {
   console.log('Processing audio file with local Python Whisper service:', audioFilePath);
   
   try {
-    // 檢查文件是否存在
+    // Check if file exists
     if (!fs.existsSync(audioFilePath)) {
-      throw new Error(`音頻文件不存在: ${audioFilePath}`);
+      throw new Error(`Audio file does not exist: ${audioFilePath}`);
     }
 
     const formData = new FormData();
@@ -22,39 +22,39 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
       contentType: 'audio/wav'
     });
 
-    const response = await axios.post('http://127.0.0.1:5001/transcribe', formData, {
+    const response = await axios.post(`${WHISPER_SERVICE_URL}/transcribe`, formData, {
       headers: {
         ...formData.getHeaders(),
       },
-      timeout: 120000, // 增加到 2 分鐘超時
-      maxContentLength: 50 * 1024 * 1024, // 50MB 最大內容長度
-      maxBodyLength: 50 * 1024 * 1024,    // 50MB 最大請求體長度
+      timeout: 120000, // 2 minutes timeout
+      maxContentLength: 50 * 1024 * 1024, // 50MB max content length
+      maxBodyLength: 50 * 1024 * 1024,    // 50MB max body length
     });
 
     const result = response.data;
     console.log('Whisper response:', result);
 
     if (result.transcript !== undefined) {
-      return result.transcript || ''; // 返回空字符串而不是拋出錯誤
+      return result.transcript || '';
     } else {
-      throw new Error('未收到辨識結果');
+      throw new Error('No transcription result received');
     }
   } catch (error) {
     console.error('Whisper API error:', error);
     
     if (axios.isAxiosError(error)) {
       if (error.code === 'ECONNRESET') {
-        throw new Error('Whisper 服務連接中斷 - 音頻檔案可能過大或處理時間過長');
+        throw new Error('Whisper service connection reset - audio file may be too large or processing took too long');
       } else if (error.code === 'ECONNREFUSED') {
-        throw new Error('無法連接到 Whisper 服務 - 請檢查 Docker 容器是否正在運行');
+        throw new Error('Could not connect to Whisper service - please check if the service is running');
       } else if (error.response) {
-        throw new Error(`Whisper API 錯誤: ${error.response.data?.error || error.message}`);
+        throw new Error(`Whisper API error: ${error.response.data?.error || error.message}`);
       } else {
-        throw new Error(`網路錯誤: ${error.message}`);
+        throw new Error(`Network error: ${error.message}`);
       }
     }
     
-    throw new Error('語音辨識失敗 - 請檢查 Whisper 服務狀態');
+    throw new Error('Voice recognition failed - please check Whisper service status');
   }
 }
 
