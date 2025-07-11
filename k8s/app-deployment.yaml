@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,48 +16,48 @@ spec:
         app: nextjs-app
     spec:
       containers:
-      - name: nextjs-app
-        image: local-voice-ai-app:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3000
-        env:
-        - name: OLLAMA_BASE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: voice-ai-config
-              key: OLLAMA_BASE_URL
-        - name: OLLAMA_MODEL
-          valueFrom:
-            configMapKeyRef:
-              name: voice-ai-config
-              key: OLLAMA_MODEL
-        - name: NODE_ENV
-          value: "production"
-        - name: WHISPER_SERVICE_URL
-          value: "http://whisper-service:5001"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 30
-        volumeMounts:
-        - name: tmp-volume
-          mountPath: /app/tmp
+        - name: nextjs-app
+          image: localhost:5000/local-voice-ai-app:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: OLLAMA_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: voice-ai-config
+                  key: OLLAMA_BASE_URL
+            - name: OLLAMA_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: voice-ai-config
+                  key: OLLAMA_MODEL
+            - name: NODE_ENV
+              value: "production"
+            - name: WHISPER_SERVICE_URL
+              value: "http://whisper-service:5001"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /app/tmp
       volumes:
-      - name: tmp-volume
-        emptyDir: {} 
+        - name: tmp-volume
+          emptyDir: {}

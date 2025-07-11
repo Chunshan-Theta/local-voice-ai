@@ -3,10 +3,9 @@ services:
     image: breezyvoice:latest
     build: .
     ports:
-      - "8080:8080"
+      - "8999:8080"
     volumes:
       - hf-cache:/root/.cache/huggingface/
-    command: api.py
     init: true
     deploy:
       resources:
