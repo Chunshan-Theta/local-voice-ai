@@ -4,14 +4,21 @@ import whisper
 import tempfile
 import os
 import logging
+import torch
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Check GPU availability
+device = "cuda" if torch.cuda.is_available() else "cpu"
+logger.info(f"Using device: {device}")
+if device == "cuda":
+    logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+
 # 在全局範圍載入模型，避免重複載入
 logger.info("Loading Whisper model...")
-model = whisper.load_model("tiny")
+model = whisper.load_model("tiny").to(device)
 logger.info("Whisper tiny model loaded successfully!")
 
 app = Flask(__name__)
@@ -20,7 +27,13 @@ CORS(app)  # 允許跨域請求
 @app.route('/health', methods=['GET'])
 def health_check():
     """健康檢查端點"""
-    return jsonify({"status": "healthy", "model": "whisper-tiny"})
+    return jsonify({
+        "status": "healthy", 
+        "model": "whisper-tiny",
+        "device": device,
+        "gpu_available": torch.cuda.is_available(),
+        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    })
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe_audio():

@@ -15,22 +15,34 @@ spec:
       labels:
         app: whisper
     spec:
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4  # 指定 GPU 类型
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
         - name: whisper
-          image: localhost:5072/local-voice-ai-whisper:latest
+          image: gcr.io/ai-test-465504/whisper-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5001
           env:
             - name: HF_HOME
               value: "/cache"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
           resources:
             requests:
               memory: "2Gi"
               cpu: "500m"
+              nvidia.com/gpu: "1"
             limits:
               memory: "4Gi"
               cpu: "2000m"
+              nvidia.com/gpu: "1"
           volumeMounts:
             - name: hf-cache
               mountPath: /cache

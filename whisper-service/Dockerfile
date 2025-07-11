@@ -1,12 +1,20 @@
-# Use official Python image as base
-FROM python:3.9-slim
+# Use NVIDIA CUDA image as base
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
-# Install system dependencies (including ffmpeg)
+# Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
+    python3.9 \
+    python3-pip \
+    python3.9-venv \
     ffmpeg \
     git \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Set Python environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.9 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Set working directory
 WORKDIR /app
