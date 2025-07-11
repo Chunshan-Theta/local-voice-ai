@@ -7,6 +7,12 @@ services:
     volumes:
       - hf-cache:/root/.cache/huggingface/
     init: true
+    command: ["api.py"]
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6
+      - OMP_NUM_THREADS=1
+      - CUDA_LAUNCH_BLOCKING=0
     deploy:
       resources:
         reservations:
