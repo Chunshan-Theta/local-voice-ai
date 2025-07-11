@@ -1,11 +1,17 @@
 # Use NVIDIA CUDA image as base
 FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
-    python3.9 \
+    python3 \
     python3-pip \
-    python3.9-venv \
+    python3-venv \
     ffmpeg \
     git \
     curl \
@@ -13,8 +19,11 @@ RUN apt-get update && apt-get install -y \
 
 # Set Python environment
 ENV VIRTUAL_ENV=/opt/venv
-RUN python3.9 -m venv $VIRTUAL_ENV
+RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --upgrade pip
 
 # Set working directory
 WORKDIR /app
@@ -26,13 +35,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY app.py .
 
-# Create necessary directories
-RUN mkdir -p /app/tmp && chmod 777 /app/tmp
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/tmp && chmod 755 /app/tmp
 RUN mkdir -p /root/.cache/whisper
 
 # Pre-download Whisper model
 ARG WHISPER_MODEL=small
 RUN python -c "import whisper; whisper.load_model('${WHISPER_MODEL}')"
+
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app && \
+    chown -R app:app /root/.cache/whisper
+
+# Switch to non-root user
+USER app
 
 # Expose port
 EXPOSE 5001
