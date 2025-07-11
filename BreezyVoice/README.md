@@ -1,189 +1,123 @@
-# BreezyVoice
+# 🎙️ BreezyVoice TTS API
 
-BreezyVoice is a voice-cloning text-to-speech system specifically adapted for Taiwanese Mandarin, highlighting phonetic control abilities via auxiliary 注音 (bopomofo) inputs. BreezyVoice is partially derived from [CosyVoice](https://github.com/FunAudioLLM/CosyVoice). BreezyVoice is part of the [Breeze2 family](https://huggingface.co/collections/MediaTek-Research/breeze2-family-67863158443a06a72dd29900)
+基於 Hugging Face Transformers 的文本轉語音 (TTS) API 服務，支援中文和多種語言，GPU 優化。
 
-<img src="https://raw.githubusercontent.com/mtkresearch/BreezyVoice/main/images/flowchart.png" alt="flowchart" width="700"/>
+## ✨ 特色功能
 
-🚀 **Try out our interactive [UI playground](https://huggingface.co/spaces/Splend1dchan/BreezyVoice-Playground) now!** 🚀 
+- 🎯 **OpenAI 兼容 API**: 保持與 OpenAI TTS API 相同的介面
+- 🌏 **中文支援**: 完整的中文語音合成支援
+- 🚀 **GPU 加速**: 自動檢測和使用 GPU，顯著提升推理速度
+- 🔧 **多模型選擇**: 支援多種 TTS 模型
+- 📊 **性能監控**: 內建 GPU 狀態監控
+- 🐳 **Docker 支援**: 完整的容器化部署（GPU 支援）
 
-🚀 **[立即體驗 BreezyVoice 語音合成](https://huggingface.co/spaces/Splend1dchan/BreezyVoice-Playground) !** 🚀 
+## 🚀 快速開始
 
-Or visit one of these resources:  
-- [Playground (CLI Inference)](https://www.kaggle.com/code/a24998667/breezyvoice-playground)  
-- [Model](https://huggingface.co/MediaTek-Research/BreezyVoice/tree/main)  
-- [Paper](https://arxiv.org/abs/2501.17790) 
+### 方法 1: 直接運行
 
-
-Repo Main Contributors: Chia-Chun Lin, Chan-Jan Hsu
-
-## Features
-🔥 BreezyVoice outperforms competing commercial services in terms of naturalness.
-
-
-
-<img src="https://raw.githubusercontent.com/mtkresearch/BreezyVoice/main/images/comparisons.png" alt="comparisons" width="350"/>
-
- 🔥 BreezyVoice is highly competitive at code-switching scenarios.
-
-| Code-Switching Term Category        | **BreezyVoice**  | Z | Y | U | M |
-|-------------|--------------|---|---|---|---|
-| **General Words** | **8**            | 5 | **8** | **8** | 7 |
-| **Entities**| **9**         | 6 | 4 | 7 | 4 |
-| **Abbreviations**   | **9**            | 8 | 6 | 6 | 7 |
-| **Toponyms**| 3            | 3 | **7** | 3 | 4 |
-| **Full Sentences**| 7           | 7 | **8** | 5 | 3 |
-
-🔥 BreezyVoice supports automatic 注音 annotation, as well as manual 注音 correction (See Inference).
-
-
-## Install
-
-**Clone and install**
-
-- Clone the repo
-``` sh
-git clone https://github.com/mtkresearch/BreezyVoice.git
-# If you failed to clone submodule due to network failures, please run following command until success
-cd BreezyVoice
-```
-
-- Install Requirements (requires Python3.10)
-```
-pip uninstall onnxruntime # use onnxruntime-gpu instead of onnxruntime
-pip install -r requirements.txt
-```
-(The model is runnable on CPU, please change onnxruntime-gpu to onnxruntime in `requirements.txt` if you do not have GPU in your environment)
-
-You might need to install cudnn depending on cuda version
-```
-sudo apt-get -y install cudnn9-cuda-11
-```
-## Inference
-
-UTF8 encoding is required:
-
-``` sh
-export PYTHONUTF8=1
-```
----
-**Run single_inference.py with the following arguments:**
-
-- `--content_to_synthesize`:
-    - **Description**: Specifies the content that will be synthesized into speech. Phonetic symbols can optionally be included but should be used sparingly, as shown in the examples below:
-    - Simple text: `"今天天氣真好"`
-    - Text with phonetic symbols: `"今天天氣真好[:ㄏㄠ3]"`
-
-- `--speaker_prompt_audio_path`:
-  - **Description**: Specifies the path to the prompt speech audio file for setting the style of the speaker. Use your custom audio file or our example file:
-    - Example audio: `./data/tc_speaker.wav`
-
-- `--speaker_prompt_text_transcription` (optional):
-  - **Description**: Specifies the transcription of the speaker prompt audio. Providing this input is highly recommended for better accuracy. If not provided, the system will automatically transcribe the audio using Whisper.
-  - Example text for the audio file: `"在密碼學中，加密是將明文資訊改變為難以讀取的密文內容，使之不可讀的方法。只有擁有解密方法的對象,經由解密過程才能將密文還原為正常可讀的內容。"`
-
-- `--output_path` (optional):
-  - **Description**: Specifies the name and path for the output `.wav` file. If not provided, the default path is used.
-  - **Default Value**: `results/output.wav`
-  - Example: `[your_file_name].wav`
-
-- `--model_path` (optional):
-  - **Description**: Specifies the pre-trained model used for speech synthesis.
-  - **Default Value**: `MediaTek-Research/BreezyVoice`
-
-**Example Usage:**
-
-``` bash
-bash run_single_inference.sh
-```
-
-``` python
-# python single_inference.py --text_to_speech [text to be converted into audio] --text_prompt [the prompt of that audio file] --audio_path [reference audio file]
-python single_inference.py --content_to_synthesize "今天天氣真好" --speaker_prompt_text_transcription "在密碼學中，加密是將明文資訊改變為難以讀取的密文內容，使之不可讀的方法。只有擁有解密方法的對象,經由解密過程才能將密文還原為正常可讀的內容。" --speaker_prompt_audio_path "./data/example.wav"
-```
-
-``` python
-# python single_inference.py --text_to_speech [text to be converted into audio] --audio_path [reference audio file]
-python single_inference.py --content_to_synthesize "今天天氣真好[:ㄏㄠ3]" --speaker_prompt_audio_path "./data/example.wav"
-```
-
----
-
-**Run `batch_inference.py` with the following arguments:**
-
-- `--csv_file`:
-  - **Description**: Path to the CSV file that contains the input data for batch processing.
-  - **Example**: `./data/batch_files.csv`
-
-- `--speaker_prompt_audio_folder`:
-  - **Description**: Path to the folder containing the speaker prompt audio files. The files in this folder are used to set the style of the speaker for each synthesis task.
-  - **Example**: `./data`
-
-- `--output_audio_folder`:
-  - **Description**: Path to the folder where the output audio files will be saved. Each processed row in the CSV will result in a synthesized audio file stored in this folder.
-  - **Example**: `./results`
-
-**CSV File Structure:**
-
-The CSV file should contain the following columns:
-
-- **`speaker_prompt_audio_filename`**:
-  - **Description**: The filename (without extension) of the speaker prompt audio file that will be used to guide the style of the generated speech.
-  - **Example**: `example`
-
-- **`speaker_prompt_text_transcription`**:
-  - **Description**: The transcription of the speaker prompt audio. This field is optional but highly recommended to improve transcription accuracy. If not provided, the system will attempt to transcribe the audio using Whisper.
-  - **Example**: `"在密碼學中，加密是將明文資訊改變為難以讀取的密文內容，使之不可讀的方法。"`
-
-- **`content_to_synthesize`**:
-  - **Description**: The content that will be synthesized into speech. You can include phonetic symbols if needed, though they should be used sparingly.
-  - **Example**: `"今天天氣真好"`
-
-- **`output_audio_filename`**:
-  - **Description**: The filename (without extension) for the generated output audio. The audio will be saved as a `.wav` file in the output folder.
-  - **Example**: `output`
-
-**Example Usage:**
-
-``` bash
-bash run_batch_inference.sh
-```
 ```bash
-python batch_inference.py \
-  --csv_file ./data/batch_files.csv \
-  --speaker_prompt_audio_folder ./data \
-  --output_audio_folder ./results
+# 安裝依賴
+pip install -r requirements.txt
+
+# 啟動服務（GPU 優化）
+python start.py
+
+# 或者使用標準 API
+python api.py
 ```
 
-### Docker and OpenAI Compatible API
+### 方法 2: 使用 Docker
 
-``` bash
-$ docker compose up -d --build
-# after the container is up
-$ pip install openai
-$ python openai_api_inference.py
+```bash
+# 快速部署（包含 GPU 支援）
+./deploy.sh
+
+# 或者手動操作
+docker-compose up -d
 ```
 
----
+### 3. 測試服務
 
-If you like our work, please cite:
+```bash
+# 基本測試
+python test_tts.py
 
+# GPU 使用情況測試
+python test_gpu_usage.py
+
+# 性能測試
+python performance_test.py
 ```
-@article{hsu2025breezyvoice,
-  title={BreezyVoice: Adapting TTS for Taiwanese Mandarin with Enhanced Polyphone Disambiguation--Challenges and Insights},
-  author={Hsu, Chan-Jan and Lin, Yi-Cheng and Lin, Chia-Chun and Chen, Wei-Chih and Chung, Ho Lam and Li, Chen-An and Chen, Yi-Chang and Yu, Chien-Yu and Lee, Ming-Ji and Chen, Chien-Cheng and others},
-  journal={arXiv preprint arXiv:2501.17790},
-  year={2025}
+
+## 📚 文件說明
+
+- `api.py` - 主要 API 服務（GPU 優化）
+- `start.py` - GPU 優化啟動腳本
+- `test_tts.py` - 功能測試腳本
+- `test_gpu_usage.py` - GPU 使用情況測試
+- `performance_test.py` - 性能測試腳本
+- `deploy.sh` - 部署腳本
+- `Dockerfile` - GPU 優化 Docker 映像
+- `docker-compose.yml` - Docker Compose 配置
+- `README_GPU.md` - GPU 詳細使用指南
+- `QUICKSTART.md` - 快速開始指南
+
+## 🎯 API 端點
+
+### GET /v1/models
+獲取可用的 TTS 模型列表
+
+### GET /v1/gpu-status
+獲取 GPU 使用狀態（新增）
+
+### POST /v1/audio/speech
+獲取可用的模型列表
+
+### POST /v1/audio/speech
+語音合成端點
+
+**請求格式:**
+```json
+{
+  "model": "suno/bark",
+  "input": "你好世界",
+  "response_format": "wav",
+  "speed": 1.0
 }
-@article{hsu2025breeze,
-  title={The Breeze 2 Herd of Models: Traditional Chinese LLMs Based on Llama with Vision-Aware and Function-Calling Capabilities},
-  author={Hsu, Chan-Jan and Liu, Chia-Sheng and Chen, Meng-Hsi and Chen, Muxi and Hsu, Po-Chun and Chen, Yi-Chang and Shiu, Da-Shan},
-  journal={arXiv preprint arXiv:2501.13921},
-  year={2025}
-}
-@article{du2024cosyvoice,
-  title={Cosyvoice: A scalable multilingual zero-shot text-to-speech synthesizer based on supervised semantic tokens},
-  author={Du, Zhihao and Chen, Qian and Zhang, Shiliang and Hu, Kai and Lu, Heng and Yang, Yexin and Hu, Hangrui and Zheng, Siqi and Gu, Yue and Ma, Ziyang and others},
-  journal={arXiv preprint arXiv:2407.05407},
-  year={2024}
-}
 ```
+
+## 🔧 支援的模型
+
+| 模型 | 語言 | 速度 | 品質 | 大小 |
+|------|------|------|------|------|
+| suno/bark | 多語言 | 中等 | 高 | 中 |
+| suno/bark-small | 多語言 | 快 | 中 | 小 |
+| espnet/kan-bayashi_ljspeech_vits | 英語 | 快 | 中 | 中 |
+
+## 🐳 Docker 部署
+
+```bash
+# 一鍵部署
+./deploy_hf_tts.sh
+
+# 或使用 Docker Compose
+docker-compose -f docker-compose.hf.yml up -d
+```
+
+## 📈 性能優化
+
+1. **使用 GPU**: 確保安裝 CUDA 版本的 PyTorch
+2. **選擇合適模型**: 根據需求選擇速度和品質的平衡
+3. **模型快取**: 首次運行後模型會快取到本地
+
+## 🆘 故障排除
+
+詳見 [QUICKSTART.md](QUICKSTART.md) 中的故障排除章節。
+
+## 📝 授權
+
+MIT License
+
+## 🗂️ 舊版本備份
+
+舊的 BreezyVoice 相關文件已移動到 `backup_old_modules/` 目錄，如需要可以隨時恢復。

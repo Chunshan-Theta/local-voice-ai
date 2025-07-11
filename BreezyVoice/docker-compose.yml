@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  breezyvoice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tts-api:latest
+    container_name: tts-api
+    ports:
+      - "8000:8000"
+    environment:
+      - TTS_MODEL_PATH=suno/bark
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - TRANSFORMERS_CACHE=/app/hf_cache
+      - HF_HOME=/app/hf_cache
+    volumes:
+      - ./hf_cache:/app/hf_cache
+      - ./results:/app/results
+      - ./test_outputs:/app/test_outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/gpu-status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
