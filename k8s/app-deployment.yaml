@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: nextjs-app
-          image: localhost:5000/local-voice-ai-app:latest
+          image: localhost:5072/local-voice-ai-app:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

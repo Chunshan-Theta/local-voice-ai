@@ -16,13 +16,6 @@ spec:
                 name: whisper-service
                 port:
                   number: 5001
-          - path: /api/breezy
-            pathType: Prefix
-            backend:
-              service:
-                name: breezyvoice-service
-                port:
-                  number: 8999
           - path: /
             pathType: Prefix
             backend:

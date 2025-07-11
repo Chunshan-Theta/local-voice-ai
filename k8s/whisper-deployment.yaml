@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: whisper
-          image: localhost:5000/local-voice-ai-whisper:latest
+          image: localhost:5072/local-voice-ai-whisper:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5001
