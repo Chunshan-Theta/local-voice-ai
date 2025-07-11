@@ -16,6 +16,13 @@ spec:
                 name: whisper-service
                 port:
                   number: 5001
+          - path: /api/ollama
+            pathType: Prefix
+            backend:
+              service:
+                name: ollama-service
+                port:
+                  number: 11434
           - path: /
             pathType: Prefix
             backend:
