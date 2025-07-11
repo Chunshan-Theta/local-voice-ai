@@ -4,6 +4,10 @@ import tempfile
 import wave
 import numpy as np
 import os
+import subprocess
+import time
+import sys
+import signal
 
 def create_test_audio():
     """創建一個簡單的測試音頻檔案"""
