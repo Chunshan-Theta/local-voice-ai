@@ -57,6 +57,7 @@ sed -i "s|gcr.io/$PROJECT_ID/whisper-service:latest|$REGION-docker.pkg.dev/$PROJ
 # Apply PVC first
 echo "📦 Applying PVC..."
 kubectl apply -f hf-cache-pvc.yaml
+kubectl apply -f ollama-pvc.yaml    
 
 # Apply ConfigMap
 echo "⚙️ Applying ConfigMap..."

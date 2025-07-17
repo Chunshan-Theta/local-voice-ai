@@ -23,7 +23,7 @@ spec:
         effect: "NoSchedule"
       containers:
         - name: whisper
-          image: gcr.io/ai-test-465504/whisper-service:latest
+          image: us-west4-docker.pkg.dev/ai-test-465504/local-voice-ai-repo/whisper-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5001

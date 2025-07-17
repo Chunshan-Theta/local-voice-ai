@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: nextjs-app
-          image: gcr.io/ai-test-465504/local-voice-ai:latest
+          image: us-west4-docker.pkg.dev/ai-test-465504/local-voice-ai-repo/local-voice-ai:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
