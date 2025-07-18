@@ -13,8 +13,8 @@ echo "🔄 Configuring Docker authentication..."
 gcloud auth configure-docker $REGION-docker.pkg.dev -q
 
 
-# 构建 Docker 镜像
-echo "🏗️ Building Docker images..."
+# 构建 Docker 镜像 (指定平台为 AMD64 以兼容 GKE)
+echo "🏗️ Building Docker images for AMD64 platform..."
 docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest ./app
 docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest ./whisper-service
 

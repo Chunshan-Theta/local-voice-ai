@@ -27,13 +27,30 @@ CORS(app)  # 允許跨域請求
 @app.route('/health', methods=['GET'])
 def health_check():
     """健康檢查端點"""
-    return jsonify({
-        "status": "healthy", 
-        "model": "whisper-tiny",
-        "device": device,
-        "gpu_available": torch.cuda.is_available(),
-        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
-    })
+    try:
+        gpu_name = None
+        if torch.cuda.is_available():
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+            except RuntimeError as e:
+                logger.warning(f"Could not get GPU name: {e}")
+                gpu_name = "GPU available but name unavailable"
+        
+        return jsonify({
+            "status": "healthy", 
+            "model": "whisper-tiny",
+            "device": device,
+            "gpu_available": torch.cuda.is_available(),
+            "gpu_name": gpu_name
+        })
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return jsonify({
+            "status": "healthy", 
+            "model": "whisper-tiny",
+            "device": device,
+            "error": str(e)
+        })
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe_audio():
