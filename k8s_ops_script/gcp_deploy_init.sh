@@ -39,9 +39,9 @@ if ! gcloud container node-pools list --cluster $CLUSTER_NAME --zone $ZONE | gre
         --cluster $CLUSTER_NAME \
         --zone $ZONE \
         --num-nodes 1 \
-        --machine-type n1-standard-4 \
-        --accelerator type=nvidia-tesla-t4,count=1 \
-        --disk-size 50 \
+        --machine-type g2-standard-4 \
+        --accelerator type=nvidia-l4,count=1 \
+        --disk-size 100 \
         --enable-autoscaling \
         --min-nodes 1 \
         --max-nodes 3

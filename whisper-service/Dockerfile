@@ -1,5 +1,5 @@
 # Use NVIDIA CUDA image as base
-FROM nvidia/cuda:11.8-devel-ubuntu22.04
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -39,9 +39,6 @@ COPY app.py .
 RUN mkdir -p /app/tmp && chmod 755 /app/tmp
 RUN mkdir -p /root/.cache/whisper
 
-# Pre-download Whisper model
-ARG WHISPER_MODEL=small
-RUN python -c "import whisper; whisper.load_model('${WHISPER_MODEL}')"
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app && \

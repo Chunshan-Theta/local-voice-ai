@@ -6,7 +6,6 @@ metadata:
   name: voice-ai-ingress-nextjs
   annotations:
     kubernetes.io/ingress.class: "gce"
-    kubernetes.io/ingress.global-static-ip-name: "voice-ai-nextjs-ip"
 spec:
   rules:
     - http:
@@ -27,7 +26,6 @@ metadata:
   name: voice-ai-ingress-ollama
   annotations:
     kubernetes.io/ingress.class: "gce"
-    kubernetes.io/ingress.global-static-ip-name: "voice-ai-ollama-ip"
 spec:
   rules:
     - http:
@@ -48,7 +46,6 @@ metadata:
   name: voice-ai-ingress-whisper
   annotations:
     kubernetes.io/ingress.class: "gce"
-    kubernetes.io/ingress.global-static-ip-name: "voice-ai-whisper-ip"
 spec:
   rules:
     - http:

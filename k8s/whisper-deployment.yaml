@@ -15,18 +15,26 @@ spec:
       labels:
         app: whisper
     spec:
-      nodeSelector:
-        cloud.google.com/gke-accelerator: nvidia-tesla-t4  # 指定 GPU 类型
-      tolerations:
-      - key: "nvidia.com/gpu"
-        operator: "Exists"
-        effect: "NoSchedule"
       containers:
         - name: whisper
           image: us-west4-docker.pkg.dev/ai-test-465504/local-voice-ai-repo/whisper-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
           env:
             - name: HF_HOME
               value: "/cache"
@@ -36,8 +44,8 @@ spec:
               value: "all"
           resources:
             requests:
-              memory: "4Gi"
-              cpu: "1"
+              memory: "8Gi"
+              cpu: "2"
               nvidia.com/gpu: "1"
             limits:
               memory: "16Gi"

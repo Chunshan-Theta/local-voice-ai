@@ -48,7 +48,7 @@ export default function Home() {
   const volumeChangeCountRef = useRef<number>(0);
 
   // 語音活動檢測參數
-  const SILENCE_DURATION = 3000; // 3秒靜音後自動發送
+  const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
   const MIN_RECORDING_TIME = 1000; // 最短錄音時間 1秒
   const CALIBRATION_DURATION = 3000; // 3秒校準時間
 
@@ -128,11 +128,11 @@ export default function Home() {
       if (ttsVolumeSamplesRef.current.length > 8) {
         const avgTtsVolume = ttsVolumeSamplesRef.current.reduce((sum, vol) => sum + vol, 0) / ttsVolumeSamplesRef.current.length;
         const maxTtsVolume = Math.max(...ttsVolumeSamplesRef.current);
-        // 使用平衡的倍數：取平均值的1.6倍或最大值的1.3倍，選較大者
+        // 使用平衡的倍數：取平均值的1.4倍或最大值的1.2倍，選較大者
         const balancedThreshold = Math.max(
-          avgTtsVolume * 1.2,
-          maxTtsVolume * 1,
-          baselineNoiseRef.current + 20
+          avgTtsVolume * 1.4,
+          maxTtsVolume * 1.2,
+          baselineNoiseRef.current + 30
         );
         return balancedThreshold;
       }

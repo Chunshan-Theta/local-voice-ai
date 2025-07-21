@@ -6,3 +6,5 @@ metadata:
 data:
   OLLAMA_BASE_URL: "http://ollama-service:11434"
   OLLAMA_MODEL: "gemma3:1b"
+  WHISPER_MODEL: "tiny"
+  WHISPER_SERVICE_URL: "http://whisper-service:5001"

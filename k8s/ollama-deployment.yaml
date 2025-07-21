@@ -13,39 +13,30 @@ spec:
         app: ollama
     spec:
       containers:
-      - name: ollama
-        image: ollama/ollama:latest
-        ports:
-        - containerPort: 11434
-        resources:
-          requests:
-            nvidia.com/gpu: 1
-            memory: "2Gi"
-            cpu: "1"
-          limits:
-            nvidia.com/gpu: 1
-            memory: "4Gi"
-            cpu: "2"
-        lifecycle:
-          postStart:
-            exec:
-              command: ["/bin/sh", "-c", "ollama pull gemma3:1b"]
-        livenessProbe:
-          httpGet:
-            path: /api/tags
-            port: 11434
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /api/tags
-            port: 11434
-          initialDelaySeconds: 10
-          periodSeconds: 5
-        volumeMounts:
-        - name: ollama-data
-          mountPath: /root/.ollama
+        - image: ollama/ollama
+          imagePullPolicy: IfNotPresent
+          name: llm
+          ports:
+            - containerPort: 11434
+              protocol: TCP
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0"
+            - name: OLLAMA_MODELS
+              value: "/ollama/models"
+          volumeMounts:
+            - name: ollama-storage
+              mountPath: /ollama
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              memory: "8Gi"
+              cpu: "2"
+            requests:
+              nvidia.com/gpu: "1"
+              memory: "4Gi"
+              cpu: "1"
       volumes:
-      - name: ollama-data
-        persistentVolumeClaim:
-          claimName: ollama-pvc 
+        - name: ollama-storage
+          persistentVolumeClaim:
+            claimName: ollama-pvc

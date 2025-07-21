@@ -16,10 +16,14 @@ logger.info(f"Using device: {device}")
 if device == "cuda":
     logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
 
+# Get Whisper model from environment variable
+whisper_model = os.getenv("WHISPER_MODEL", "tiny")
+logger.info(f"Whisper model configured: {whisper_model}")
+
 # 在全局範圍載入模型，避免重複載入
-logger.info("Loading Whisper model...")
-model = whisper.load_model("tiny").to(device)
-logger.info("Whisper tiny model loaded successfully!")
+logger.info(f"Loading Whisper model: {whisper_model}...")
+model = whisper.load_model(whisper_model).to(device)
+logger.info(f"Whisper {whisper_model} model loaded successfully!")
 
 app = Flask(__name__)
 CORS(app)  # 允許跨域請求
@@ -29,25 +33,39 @@ def health_check():
     """健康檢查端點"""
     try:
         gpu_name = None
-        if torch.cuda.is_available():
-            try:
-                gpu_name = torch.cuda.get_device_name(0)
-            except RuntimeError as e:
-                logger.warning(f"Could not get GPU name: {e}")
-                gpu_name = "GPU available but name unavailable"
+        gpu_available = False
+        
+        # Check GPU availability more safely in multiprocessing context
+        try:
+            gpu_available = torch.cuda.is_available()
+            if gpu_available:
+                # Only try to get GPU name if we're not in a forked subprocess
+                import multiprocessing
+                if multiprocessing.current_process().name == 'MainProcess':
+                    gpu_name = torch.cuda.get_device_name(0)
+                else:
+                    gpu_name = "GPU available (name check skipped in subprocess)"
+        except RuntimeError as e:
+            if "CUDA" in str(e) and "forked subprocess" in str(e):
+                logger.info("CUDA not accessible in forked subprocess - this is normal")
+                gpu_available = device == "cuda"  # Use the device determined at startup
+                gpu_name = "GPU available (CUDA context not available in subprocess)"
+            else:
+                logger.warning(f"Could not check GPU: {e}")
+                gpu_name = "GPU status unknown"
         
         return jsonify({
             "status": "healthy", 
-            "model": "whisper-tiny",
+            "model": f"whisper-{whisper_model}",
             "device": device,
-            "gpu_available": torch.cuda.is_available(),
+            "gpu_available": gpu_available,
             "gpu_name": gpu_name
         })
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return jsonify({
             "status": "healthy", 
-            "model": "whisper-tiny",
+            "model": f"whisper-{whisper_model}",
             "device": device,
             "error": str(e)
         })

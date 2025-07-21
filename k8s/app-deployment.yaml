@@ -35,7 +35,15 @@ spec:
             - name: NODE_ENV
               value: "production"
             - name: WHISPER_SERVICE_URL
-              value: "http://whisper-service:5001"
+              valueFrom:
+                configMapKeyRef:
+                  name: voice-ai-config
+                  key: WHISPER_SERVICE_URL
+            - name: WHISPER_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: voice-ai-config
+                  key: WHISPER_MODEL
           resources:
             requests:
               memory: "256Mi"

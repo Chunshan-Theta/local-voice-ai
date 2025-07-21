@@ -15,11 +15,13 @@ gcloud auth configure-docker $REGION-docker.pkg.dev -q
 
 # 构建 Docker 镜像 (指定平台为 AMD64 以兼容 GKE)
 echo "🏗️ Building Docker images for AMD64 platform..."
-docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest ./app
-docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest ./whisper-service
+docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest ./app
+docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest ./whisper-service
+# docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local_ollama:latest ./local_ollama
 
 # 推送镜像到 Artifact Registry
 echo "⬆️ Pushing images to Artifact Registry..."
 docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest
 docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest
+# docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local_ollama:latest
 
