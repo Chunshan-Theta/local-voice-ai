@@ -16,6 +16,14 @@ spec:
         - image: ollama/ollama
           imagePullPolicy: IfNotPresent
           name: llm
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              ollama serve &
+              sleep 15
+              ollama pull gemma3:1b
+              wait
           ports:
             - containerPort: 11434
               protocol: TCP
