@@ -1,48 +1,48 @@
-# 本地語音 AI 解決方案 (Local Voice AI Solution)
+# Local Voice AI Solution
 
-這個專案在於整合聲音互動元件所形成之本地語音解決方案，提供完整的語音對話體驗。系統採用微服務架構，結合了語音識別、自然語言處理和語音合成技術，打造出可在本地環境運行的智能語音助手。
+This project integrates voice interaction components to create a comprehensive local voice AI solution, providing a complete voice conversation experience. The system uses a microservices architecture that combines speech recognition, natural language processing, and voice synthesis technologies to create an intelligent voice assistant that runs in a local environment.
 
-## 📋 專案概述
+## 📋 Project Overview
 
-本專案整合多個聲音互動元件，包括：
-- **語音識別服務** - 使用 OpenAI Whisper 模型進行語音轉文字
-- **智能對話引擎** - 基於 Ollama LLaMA3 模型提供智能回應
-- **Web 前端介面** - Next.js 應用程式提供瀏覽器語音互動
-- **容器化部署** - 支援 Docker 和 Kubernetes 部署
+This project integrates multiple voice interaction components, including:
+- **Speech Recognition Service** - Uses OpenAI Whisper model for speech-to-text conversion
+- **Intelligent Conversation Engine** - Provides intelligent responses based on Ollama models
+- **Web Frontend Interface** - Next.js application for browser voice interaction
+- **Containerized Deployment** - Supports Docker and Kubernetes deployment
 
-## 🏗️ 系統架構
+## 🏗️ System Architecture
 
 ```
-                          使用者語音互動流程
+                          User Voice Interaction Flow
     ┌─────────────────────────────────────────────────────────────────┐
     │                                                                 │
-    ▼                  ①錄製語音                                        │
+    ▼                  ①Record Voice                                   │
 ┌─────────┐         ┌──────────────┐                                   │
-│  使用者  │────────►│ Web Frontend │                                   │
-│ (瀏覽器) │         │  (Next.js)   │                                   │
+│  User   │────────►│ Web Frontend │                                   │
+│(Browser)│         │  (Next.js)   │                                   │
 └─────────┘         └──────┬───────┘                                   │
     ▲                      │                                           │
-    │                      │②上傳音訊檔案                               │
-    │⑤播放回應              ▼                                           │
-    │              ┌──────────────┐   ③語音轉文字   ┌─────────────────┐ │
+    │                      │②Upload Audio File                         │
+    │⑤Play Response         ▼                                           │
+    │              ┌──────────────┐   ③Speech-to-Text   ┌─────────────────┐ │
     │              │   API Route  │──────────────►│ Whisper Service │ │
     │              │  (/api/*)    │◄──────────────│   (Flask API)   │ │
-    │              └──────┬───────┘   ④回傳文字    └─────────────────┘ │
+    │              └──────┬───────┘   ④Return Text    └─────────────────┘ │
     │                     │                                           │
-    │                     │⑤傳送文字                                   │
+    │                     │⑤Send Text                                  │
     │                     ▼                                           │
     │              ┌─────────────────┐                                 │
     │              │ Ollama Service  │                                 │
     │              │   (LLaMA3)      │                                 │
     │              └─────────────────┘                                 │
     │                     │                                           │
-    └─────────────────────┘⑥回傳AI回應                                 │
+    └─────────────────────┘⑥Return AI Response                        │
                                                                       │
 
 ```
 ```
 
-                        Kubernetes 叢集環境                           
+                        Kubernetes Cluster Environment                           
     ┌─────────────────────────────────────────────────────────────────┘
     │
     │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
@@ -57,105 +57,106 @@
     │                           │
     │  ┌─────────────────────────┼─────────────────────────┐
     │  │                 Service Network                  │
-    │  │          (負載均衡 & 服務發現)                     │
+    │  │          (Load Balancing & Service Discovery)    │
     │  └─────────────────────────────────────────────────┘
     └─────────────────────────────────────────────────────
 ```
 
-## 🚀 主要功能
+## 🚀 Key Features
 
-- 🎤 **瀏覽器語音錄製** - 支援即時語音輸入和錄製
-- 🔊 **高精度語音識別** - 使用 Whisper 模型進行語音轉文字
-- 🤖 **智能對話生成** - 基於 oLLaMA 模型的自然語言處理
-- 💬 **即時對話介面** - 流暢的用戶互動體驗
-- 🐳 **容器化部署** - 支援 Docker 和 Kubernetes 環境
-- 🔧 **可擴展架構** - 微服務設計便於維護和擴展
+- 🎤 **Browser Voice Recording** - Supports real-time voice input and recording
+- 🔊 **High-Precision Speech Recognition** - Uses Whisper model for speech-to-text conversion
+- 🤖 **Intelligent Conversation Generation** - Natural language processing based on oLLaMA models
+- 💬 **Real-time Conversation Interface** - Smooth user interaction experience
+- 🐳 **Containerized Deployment** - Supports Docker and Kubernetes environments
+- 🔧 **Scalable Architecture** - Microservices design for easy maintenance and expansion
 
-## 🛠️ 技術棧
+## 🛠️ Technology Stack
 
-### 前端
-- **Next.js** - React 框架
-- **TypeScript** - 型別安全
-- **MediaRecorder API** - 瀏覽器音訊錄製
+### Frontend
+- **Next.js** - React framework
+- **TypeScript** - Type safety
+- **MediaRecorder API** - Browser audio recording
 
-### 後端服務
-- **Flask** - Whisper 語音識別服務
-- **Ollama** - LLaMA3 對話模型服務
-- **Python** - 後端邏輯處理
+### Backend Services
+- **Flask** - Whisper speech recognition service
+- **Ollama** - LLaMA3 conversation model service
+- **Python** - Backend logic processing
 
-### 部署與營運
-- **Docker** - 容器化技術
-- **Kubernetes** - 容器編排
-- **Google Kubernetes Engine (GKE)** - 雲端部署
+### Deployment & Operations
+- **Docker** - Containerization technology
+- **Kubernetes** - Container orchestration
+- **Google Kubernetes Engine (GKE)** - Cloud deployment
 
-## 🚀 快速開始
+## 🚀 Quick Start
 
-### Kubernetes 部署
+### Kubernetes Deployment
 
-在 Kubernetes 叢集上部署完整系統：
+Deploy the complete system on a Kubernetes cluster:
 
 ```bash
-1. ./k8s_ops_script/gcp_deploy_init.sh
-2. ./k8s_ops_script/gcp_deploy_build.sh
-3. ./k8s_ops_script/gcp_deploy_deploy.sh
+1. export $(grep -v '^#' ./.env | xargs)
+2. ./k8s_ops_script/gcp_deploy_init.sh
+3. ./k8s_ops_script/gcp_deploy_build.sh
+4. ./k8s_ops_script/gcp_deploy_deploy.sh
 ```
 
-### 本地開發環境
+### Local Development Environment
 
-1. **啟動 Whisper 服務**
+1. **Start Whisper Service**
 ```bash
 cd whisper-service
 pip install -r requirements.txt
 python app.py
 ```
 
-2. **啟動 Ollama 服務**
+2. **Start Ollama Service**
 ```bash
-# 安裝並啟動 Ollama
+# Install and start Ollama
 ollama serve
 ollama pull llama3
 ```
 
-3. **啟動前端應用**
+3. **Start Frontend Application**
 ```bash
 cd app
 npm install
 npm run dev
 ```
 
-## 📁 專案結構
+## 📁 Project Structure
 
 ```
 local-voice-ai/
-├── app/                    # Next.js 前端應用
-├── whisper-service/        # Whisper 語音識別服務
-├── k8s/                   # Kubernetes 部署配置
-├── k8s_ops_script/        # 營運腳本
-└── README.md              # 專案說明文件
+├── app/                    # Next.js frontend application
+├── whisper-service/        # Whisper speech recognition service
+├── k8s/                   # Kubernetes deployment configuration
+├── k8s_ops_script/        # Operations scripts
+└── README.md              # Project documentation
 ```
 
-## 🔧 配置說明
+## 🔧 Configuration
 
-### 環境變數
-- `WHISPER_MODEL`: Whisper 模型版本 (tiny/base/small/medium/large)
-- `OLLAMA_HOST`: Ollama 服務地址
-- `PORT`: 服務埠號
+### Environment Variables
+- `WHISPER_MODEL`: Whisper model version (tiny/base/small/medium/large)
+- `OLLAMA_HOST`: Ollama service address
+- `PORT`: Service port number
 
-### Kubernetes 資源
-- **Deployments**: 應用服務部署
-- **Services**: 服務暴露和負載均衡
-- **ConfigMaps**: 配置管理
-- **PersistentVolumes**: 資料持久化
+### Kubernetes Resources
+- **Deployments**: Application service deployment
+- **Services**: Service exposure and load balancing
+- **ConfigMaps**: Configuration management
+- **PersistentVolumes**: Data persistence
 
-## 🌟 特色優勢
+## 🌟 Key Advantages
 
-1. **完全本地化** - 無需依賴外部 API，保障資料隱私
-2. **高度整合** - 聲音互動元件無縫整合
-3. **容器化部署** - 易於部署和擴展
-4. **微服務架構** - 模組化設計，便於維護
-5. **多環境支援** - 支援本地開發和生產部署
+1. **Fully Local** - No dependence on external APIs, ensuring data privacy
+2. **Highly Integrated** - Seamless integration of voice interaction components
+3. **Containerized Deployment** - Easy to deploy and scale
+4. **Microservices Architecture** - Modular design for easy maintenance
+5. **Multi-Environment Support** - Supports both local development and production deployment
 
-## 📝 授權
+## 📝 License
 
-本專案採用 MIT 授權條款。
+This project is licensed under the MIT License.
 
