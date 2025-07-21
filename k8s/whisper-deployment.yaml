@@ -1,0 +1,62 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper
+  labels:
+    app: whisper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisper
+  template:
+    metadata:
+      labels:
+        app: whisper
+    spec:
+      containers:
+        - name: whisper
+          image: us-west4-docker.pkg.dev/ai-test-465504/local-voice-ai-repo/whisper-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5001
+          readinessProbe:
+            httpGet:
+              path: /status  # 使用更簡單的狀態端點
+              port: 5001
+            initialDelaySeconds: 60   # 減少延遲
+            periodSeconds: 10
+            timeoutSeconds: 5         # 較短的超時
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /status  # 使用更簡單的狀態端點
+              port: 5001
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          env:
+            - name: HF_HOME
+              value: "/cache"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "2"
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "32Gi"
+              cpu: "4"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /cache
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: hf-cache-pvc

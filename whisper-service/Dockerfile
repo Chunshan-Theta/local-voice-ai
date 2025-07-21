@@ -1,35 +1,65 @@
-# 使用官方 Python 映像作為基礎
-FROM python:3.9-slim
+# Use NVIDIA CUDA image as base
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
-# 安裝系統依賴 (包含 ffmpeg)
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
     ffmpeg \
     git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 設置工作目錄
+# Set Python environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Set working directory
 WORKDIR /app
 
-# 複製需求檔案並安裝 Python 依賴
+# Copy requirements file and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 複製應用程式檔案
+# Copy application files
 COPY app.py .
 
-# 預下載 Whisper 模型
-RUN python -c "import whisper; whisper.load_model('tiny')"
+# Set CUDA environment variables for optimal GPU performance
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# 創建必要的目錄
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/tmp && chmod 755 /app/tmp
 RUN mkdir -p /root/.cache/whisper
 
-# 暴露端口
-EXPOSE 5000
 
-# 健康檢查
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app && \
+    chown -R app:app /root/.cache/whisper
+
+# Switch to non-root user
+USER app
+
+# Expose port
+EXPOSE 5001
+
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD curl -f http://localhost:5001/health || exit 1
 
-# 使用 gunicorn 啟動應用，大幅增加超時時間
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "300", "--worker-connections", "1000", "--preload", "app:app"] 
+# Use Flask development server to avoid CUDA multiprocessing issues
+CMD ["python3", "app.py"] 

@@ -1,5 +1,5 @@
 # Dependencies
-/node_modules
+**/node_modules
 /.pnp
 .pnp.js
 
@@ -7,7 +7,7 @@
 /coverage
 
 # Next.js
-/.next/
+**/.next/
 /out/
 
 # Production
@@ -26,6 +26,8 @@ yarn-error.log*
 .env
 .env*.local
 .env.production
+**/.env*
+!**/env.example
 
 # Vercel
 .vercel
@@ -64,3 +66,6 @@ ENV/
 # OS
 Thumbs.db
 .DS_Store 
+
+# GCP deployment
+k8s/gcp_deploy.sh 
