@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import type { ConversationMessage } from '../lib/ollama';
 
 interface Message {
   id: string;
@@ -512,7 +513,7 @@ export default function Home() {
         return;
       }
 
-      // 步驟2：添加AI回覆消息（loading狀態）
+      // 步驟4：添加AI回覆消息（loading狀態）
       const aiMessageId = `ai_${Date.now()}`;
       const aiMessage: Message = {
         id: aiMessageId,
@@ -523,9 +524,21 @@ export default function Home() {
       };
       setMessages(prev => [...prev, aiMessage]);
 
-      // 步驟3：獲取AI回覆
+      // 步驟3：構建對話歷史（不包含當前對話）
+      const conversationHistory: ConversationMessage[] = messages
+        .filter(msg => !msg.isLoading && msg.content.trim() && msg.content !== '正在轉錄語音...' && msg.content !== '正在思考回覆...')
+        .slice(-10) // 只保留最近 10 條消息避免過長
+        .map(msg => ({
+          role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
+          content: msg.content
+        }));
+
+      console.log('Conversation history:', conversationHistory);
+
+      // 步驟4：獲取AI回覆
       const replyResponse = await axios.post('/api/reply', {
         message: transcript,
+        conversationHistory: conversationHistory,
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -810,9 +823,9 @@ export default function Home() {
       margin: '0 auto',
       padding: '1rem'
     }}>
-      <h1>本地語音 AI 助手</h1>
+      <h1>本地語音 AI 助手 🧠</h1>
       <p style={{ color: '#666', marginBottom: '1rem' }}>
-        自動校準環境音，智慧檢測語音活動。AI 回應後會自動重新開始錄音。
+        智慧對話記憶 + 真人化回應。自動校準環境音，智慧檢測語音活動。AI 會記住對話內容，回應後自動重新開始錄音。
       </p>
       
       {/* 音量監控 */}
@@ -1192,9 +1205,11 @@ export default function Home() {
       <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
         <p>✅ 智慧環境音校準，可靠的音量檢測</p>
         <p>✅ 使用 Whisper Small 模型進行中文語音辨識</p>
-        <p>✅ 連接到 Gemma3:4b 模型生成回覆</p>
+        <p>✅ 連接到 Gemma3:1b 模型生成回覆</p>
         <p>🗣️ 使用瀏覽器原生 Web Speech API 進行語音合成</p>
         <p>🔄 AI 回應後自動重新開始錄音，實現連續對話</p>
+        <p>🧠 智慧對話記憶：AI 會記住最近的對話內容，讓交談更自然</p>
+        <p>🎭 真人化回應：使用專門的提示詞讓 AI 回答更像真人對話</p>
       </div>
 
       <style jsx>{`

@@ -1,8 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { chatWithOllama } from '../../lib/ollama';
 
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 interface ReplyRequest {
   message: string;
+  conversationHistory?: ConversationMessage[];
 }
 
 interface ReplyResponse {
@@ -18,14 +24,17 @@ export default async function handler(
   }
 
   try {
-    const { message } = req.body as ReplyRequest;
+    const { message, conversationHistory = [] } = req.body as ReplyRequest;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ error: '訊息不能為空' });
     }
 
-    // AI 聊天回覆
-    const reply = await chatWithOllama(message);
+    console.log('Processing message:', message);
+    console.log('Conversation history length:', conversationHistory.length);
+
+    // AI 聊天回覆，傳入對話歷史
+    const reply = await chatWithOllama(message, conversationHistory);
 
     res.status(200).json({
       reply,
