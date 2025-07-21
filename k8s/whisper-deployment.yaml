@@ -23,18 +23,20 @@ spec:
             - containerPort: 5001
           readinessProbe:
             httpGet:
-              path: /health
+              path: /status  # 使用更簡單的狀態端點
               port: 5001
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60   # 減少延遲
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 5         # 較短的超時
+            failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /health
+              path: /status  # 使用更簡單的狀態端點
               port: 5001
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 10
+            failureThreshold: 3
           env:
             - name: HF_HOME
               value: "/cache"
@@ -48,7 +50,7 @@ spec:
               cpu: "2"
               nvidia.com/gpu: "1"
             limits:
-              memory: "16Gi"
+              memory: "32Gi"
               cpu: "4"
               nvidia.com/gpu: "1"
           volumeMounts:

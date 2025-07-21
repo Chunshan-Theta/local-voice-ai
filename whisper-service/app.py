@@ -30,7 +30,7 @@ CORS(app)  # 允許跨域請求
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """健康檢查端點"""
+    """健康檢查端點 - 快速返回，不依賴模型推理"""
     try:
         gpu_name = None
         gpu_available = False
@@ -69,6 +69,13 @@ def health_check():
             "device": device,
             "error": str(e)
         })
+
+@app.route('/status', methods=['GET'])  
+def quick_status():
+    """快速狀態檢查 - 不做任何複雜操作"""
+    return jsonify({
+        "status": "alive",
+    })
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe_audio():
@@ -120,5 +127,15 @@ def transcribe_audio():
                 logger.warning(f"Failed to delete temp file: {e}")
 
 if __name__ == '__main__':
-    # 使用生產配置
-    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True, use_reloader=False) 
+    # 確保CUDA環境正確設置
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+    
+    print(f"PyTorch CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"CUDA device count: {torch.cuda.device_count()}")
+        print(f"Current CUDA device: {torch.cuda.current_device()}")
+        print(f"Device name: {torch.cuda.get_device_name(0)}")
+    
+    # 使用單進程Flask配置避免CUDA context問題
+    app.run(host='0.0.0.0', port=5001, debug=False, threaded=False, processes=1, use_reloader=False) 

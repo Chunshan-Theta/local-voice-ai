@@ -35,6 +35,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY app.py .
 
+# Set CUDA environment variables for optimal GPU performance
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/tmp && chmod 755 /app/tmp
 RUN mkdir -p /root/.cache/whisper
@@ -55,5 +61,5 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:5001/health || exit 1
 
-# Use gunicorn to run the app
-CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "1", "--timeout", "300", "--worker-connections", "1000", "--preload", "app:app"] 
+# Use Flask development server to avoid CUDA multiprocessing issues
+CMD ["python3", "app.py"] 
