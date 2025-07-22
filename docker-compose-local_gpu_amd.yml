@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # Whisper Speech-to-Text Service with AMD GPU support
+  whisper-service:
+    build:
+      context: ./whisper-service
+      dockerfile: Dockerfile.amd
+    container_name: local-voice-ai-whisper-amd
+    ports:
+      - "5001:5001"
+    environment:
+      - HF_HOME=/cache
+      - ROC_VISIBLE_DEVICES=0
+      - HSA_OVERRIDE_GFX_VERSION=10.3.0
+      - WHISPER_MODEL=medium
+      - PYTORCH_ROCM_ARCH=gfx1030
+    volumes:
+      - hf-cache:/cache
+      - ./whisper-service/tmp:/app/tmp
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    networks:
+      - voice-ai-network
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+      - render
+    security_opt:
+      - seccomp:unconfined
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Ollama LLM Service with AMD GPU support
+  ollama-service:
+    image: ollama/ollama:rocm
+    container_name: local-voice-ai-ollama-amd
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/ollama/models
+      - ROC_VISIBLE_DEVICES=all
+      - HSA_OVERRIDE_GFX_VERSION=10.3.0
+      - PYTORCH_ROCM_ARCH=gfx1030
+    volumes:
+      - ollama-storage:/ollama
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    networks:
+      - voice-ai-network
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+      - render
+    security_opt:
+      - seccomp:unconfined
+    command: >
+      bash -c "
+        ollama serve &
+        sleep 15 &&
+        ollama pull gemma3:12b &&
+        wait
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Next.js Frontend Application
+  nextjs-app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: local-voice-ai-frontend-amd
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - OLLAMA_BASE_URL=http://ollama-service:11434
+      - OLLAMA_MODEL=gemma3:12b
+      - WHISPER_SERVICE_URL=http://whisper-service:5001
+      - WHISPER_MODEL=medium
+    networks:
+      - voice-ai-network
+    volumes:
+      - ./app/tmp:/app/tmp
+    restart: unless-stopped
+    depends_on:
+      whisper-service:
+        condition: service_healthy
+      ollama-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  voice-ai-network:
+    driver: bridge
+
+volumes:
+  # Persistent volume for Hugging Face cache (Whisper models)
+  hf-cache:
+    driver: local
+
+  # Persistent volume for Ollama models
+  ollama-storage:
+    driver: local
