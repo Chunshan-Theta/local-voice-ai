@@ -304,7 +304,7 @@ export const NOISE_CALIBRATION_CONFIG = {
   /** 正常語音閾值增量 */
   VOICE_THRESHOLD_OFFSET: 15,
   /** 搶話閾值增量（TTS播放時用於檢測打斷） */
-  INTERRUPT_THRESHOLD_OFFSET: 35,
+  INTERRUPT_THRESHOLD_OFFSET: 43,
   /** TTS 保護期閾值增量 */
   TTS_PROTECTION_THRESHOLD: 20,
   /** TTS 中等閾值增量 */
