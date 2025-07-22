@@ -37,6 +37,7 @@ export default function Home() {
   const [currentVolume, setCurrentVolume] = useState<number>(0);
   const [calibrationProgress, setCalibrationProgress] = useState<number>(0);
   const [hasDetectedVoice, setHasDetectedVoice] = useState(false);
+  const [waitingForVoiceAfterTts, setWaitingForVoiceAfterTts] = useState(false);
   
   // 簡化的refs管理
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -55,6 +56,8 @@ export default function Home() {
   // 簡化的refs
   const isListeningRef = useRef(false);
   const hasDetectedVoiceRef = useRef(false);
+  const waitingForVoiceAfterTtsRef = useRef(false);
+  const conversationStartedRef = useRef(false);
   const baselineNoiseRef = useRef(10);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -90,11 +93,16 @@ export default function Home() {
             console.log('✅ TTS播放完成');
             setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
             
-            // TTS結束後自動開始錄音
+            // TTS結束後等待語音輸入
             setTimeout(() => {
-              console.log('🎤 TTS結束後自動開始錄音');
-              if (conversationStarted && !loading && !isListeningRef.current) {
-                startListening();
+              console.log('🎤 TTS結束後等待語音輸入');
+              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, loading=${loading}, isListeningRef=${isListeningRef.current}`);
+              if (conversationStartedRef.current && !isListeningRef.current) {
+                console.log('✅ 條件滿足，設置等待語音觸發狀態');
+                setWaitingForVoiceAfterTts(true);
+                waitingForVoiceAfterTtsRef.current = true;
+              } else {
+                console.log('❌ 條件不滿足，無法設置等待語音觸發狀態');
               }
             }, 500);
           },
@@ -102,11 +110,16 @@ export default function Home() {
             console.error('❌ TTS 錯誤:', error.error);
             setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
             
-            // TTS錯誤後也要重新開始錄音
+            // TTS錯誤後也要等待語音輸入
             setTimeout(() => {
-              console.log('🎤 TTS錯誤後自動開始錄音');
-              if (conversationStarted && !loading && !isListeningRef.current) {
-                startListening();
+              console.log('🎤 TTS錯誤後等待語音輸入');
+              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, loading=${loading}, isListeningRef=${isListeningRef.current}`);
+              if (conversationStartedRef.current && !isListeningRef.current) {
+                console.log('✅ 條件滿足，設置等待語音觸發狀態');
+                setWaitingForVoiceAfterTts(true);
+                waitingForVoiceAfterTtsRef.current = true;
+              } else {
+                console.log('❌ 條件不滿足，無法設置等待語音觸發狀態');
               }
             }, 500);
           },
@@ -378,6 +391,10 @@ export default function Home() {
         stopSpeaking();
       }
       
+      // 開始錄音時清除等待狀態
+      setWaitingForVoiceAfterTts(false);
+      waitingForVoiceAfterTtsRef.current = false;
+      
       // 如果已經在錄音，先停止
       if (isListeningRef.current) {
         stopListening();
@@ -422,7 +439,9 @@ export default function Home() {
       isListeningRef.current = true;
       
       if (!conversationStarted) {
+        console.log('✅ startListening 中設置 conversationStarted = true');
         setConversationStarted(true);
+        conversationStartedRef.current = true;
       }
       
       // 持續音量監測應該已經在運行，不需要重複啟動
@@ -454,11 +473,17 @@ export default function Home() {
   };
 
   const endConversation = () => {
+    console.log('🛑 結束對話 - 設置 conversationStarted = false');
     setConversationStarted(false);
+    conversationStartedRef.current = false;
     stopRecording();
     stopVolumeMonitoring(); // 只停止錄音相關的監測
     stopSpeaking();
     setMessages([]);
+    
+    // 清除等待狀態
+    setWaitingForVoiceAfterTts(false);
+    waitingForVoiceAfterTtsRef.current = false;
     
     // 不關閉音頻流和分析器，保持持續監測
     // 只重置語音檢測狀態
@@ -470,7 +495,13 @@ export default function Home() {
     await calibrateEnvironmentalNoise();
     setTimeout(() => {
       // 持續音量監測應該已經在運行
-      startListening();
+      // 第一次對話也設置為等待語音觸發模式
+      console.log('🎤 校準完成，進入等待語音觸發模式');
+      console.log('✅ 設置 conversationStarted = true');
+      setConversationStarted(true);
+      conversationStartedRef.current = true;
+      setWaitingForVoiceAfterTts(true);
+      waitingForVoiceAfterTtsRef.current = true;
     }, 500);
   };
 
@@ -503,7 +534,7 @@ export default function Home() {
 
   const getVolumeBarColor = () => {
     if (isCalibrating) return '#ffc107';
-    if (!isListening) return '#6c757d';
+    if (!isListening && !waitingForVoiceAfterTts) return '#6c757d';
     
     const voiceThreshold = getVoiceThreshold();
     const silenceThreshold = getSilenceThreshold();
@@ -544,6 +575,16 @@ export default function Home() {
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         setCurrentVolume(average);
         
+        // 詳細的狀態調試信息（每秒輸出一次）
+        if (Math.round(Date.now() / 1000) % 5 === 0) {
+          console.log(`📊 狀態檢查: 
+            - waitingForVoiceAfterTts: ${waitingForVoiceAfterTtsRef.current}
+            - isListening: ${isListeningRef.current} 
+            - isSpeaking: ${ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : 'unknown'}
+            - 當前音量: ${average.toFixed(1)}
+            - 語音閾值: ${getVoiceThreshold().toFixed(1)}`);
+        }
+        
         // 如果正在錄音，同時進行語音檢測邏輯
         if (isListeningRef.current) {
           const voiceThreshold = getVoiceThreshold();
@@ -566,6 +607,21 @@ export default function Home() {
                 stopRecording();
               }, SILENCE_DURATION);
             }
+          }
+        }
+        
+        // 如果正在等待TTS後的語音輸入，檢測是否超過閾值
+        if (waitingForVoiceAfterTtsRef.current && !isListeningRef.current) {
+          const voiceThreshold = getVoiceThreshold();
+          console.log(`🔍 等待語音檢測中... 當前音量: ${average.toFixed(1)}, 閾值: ${voiceThreshold.toFixed(1)}`);
+          if (average >= voiceThreshold) {
+            console.log('🎤 檢測到語音，自動開始錄音');
+            setWaitingForVoiceAfterTts(false);
+            waitingForVoiceAfterTtsRef.current = false;
+            // 使用 setTimeout 避免在當前函數執行中調用 startListening
+            setTimeout(() => {
+              startListening();
+            }, 50);
           }
         }
       }, 100);
@@ -658,7 +714,7 @@ export default function Home() {
             )}
             {!isSpeaking && !isListening && conversationStarted && !isCalibrating && (
               <span style={{ color: '#007bff', marginLeft: '10px' }}>
-                🔊 等待語音輸入
+                {waitingForVoiceAfterTts ? '🔄 等待語音觸發錄音' : '🔊 等待語音輸入'}
               </span>
             )}
             {!conversationStarted && !isCalibrating && continuousVolumeCheckRef.current && (
@@ -722,7 +778,7 @@ export default function Home() {
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             
             {/* 手動開始錄音按鈕 */}
-            {!isListening && !loading && (
+            {!isListening && !loading && !waitingForVoiceAfterTts && (
               <button
                 onClick={startListening}
                 style={{
@@ -777,12 +833,16 @@ export default function Home() {
           <div style={{ 
             marginTop: '1rem', 
             padding: '0.5rem', 
-            backgroundColor: '#d1ecf1', 
+            backgroundColor: waitingForVoiceAfterTts ? '#fff3cd' : '#d1ecf1', 
             borderRadius: '4px',
             fontSize: '0.9rem',
-            color: '#0c5460'
+            color: waitingForVoiceAfterTts ? '#856404' : '#0c5460'
           }}>
-            🔄 等待語音輸入或TTS播放...
+            {waitingForVoiceAfterTts ? (
+              <>🔄 等待語音觸發錄音... （當前音量: {currentVolume.toFixed(1)}, 需要超過: {getVoiceThreshold().toFixed(1)}）</>
+            ) : (
+              <>🔄 等待語音輸入或TTS播放...</>
+            )}
             {isSpeaking && (
               <span style={{ marginLeft: '10px', color: '#28a745' }}>
                 🗣️ TTS播放中
@@ -898,7 +958,7 @@ export default function Home() {
         <p>✅ 使用 Whisper Small 模型進行中文語音辨識</p>
         <p>✅ 連接到 Gemma3:1b 模型生成回覆</p>
         <p>🗣️ 使用瀏覽器原生 Web Speech API 進行語音合成</p>
-        <p>🔄 AI 回應後自動重新開始錄音，實現連續對話</p>
+        <p>🔄 AI 回應後等待語音觸發，檢測到超過閾值的音量時自動開始錄音</p>
         <p>🧠 智慧對話記憶：AI 會記住最近的對話內容，讓交談更自然</p>
         <p>🎭 真人化回應：使用專門的提示詞讓 AI 回答更像真人對話</p>
         <p>� 持續音量監測：永遠監測環境音量，即使未開始對話也能看到音量變化</p>
