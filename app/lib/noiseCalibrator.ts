@@ -239,6 +239,29 @@ export class ThresholdCalculator {
   }
 
   /**
+   * 計算搶話閾值（用於TTS播放時的打斷檢測）
+   * 搶話閾值 = 基礎閾值 + 搶話增量
+   */
+  getInterruptThreshold(): number {
+    return this.baselineNoise + NOISE_CALIBRATION_CONFIG.INTERRUPT_THRESHOLD_OFFSET;
+  }
+
+  /**
+   * 檢查當前音量是否觸發搶話
+   */
+  shouldInterrupt(currentVolume: number, isTtsPlaying: boolean): boolean {
+    if (!isTtsPlaying) return false;
+    
+    const baseThreshold = this.getVoiceThreshold();
+    const interruptThreshold = this.getInterruptThreshold();
+    
+    // 兩階段檢測：
+    // 1. 首先音量需要超過基礎閾值（檢測到有聲音）
+    // 2. 然後音量需要超過搶話閾值（確認是想要打斷）
+    return currentVolume >= baseThreshold && currentVolume >= interruptThreshold;
+  }
+
+  /**
    * 根據當前狀態獲取適當的語音閾值
    */
   getCurrentVoiceThreshold(isTtsPlaying: boolean, ttsOptions?: {
@@ -280,6 +303,8 @@ export const NOISE_CALIBRATION_CONFIG = {
   SILENCE_THRESHOLD_OFFSET: 10,
   /** 正常語音閾值增量 */
   VOICE_THRESHOLD_OFFSET: 15,
+  /** 搶話閾值增量（TTS播放時用於檢測打斷） */
+  INTERRUPT_THRESHOLD_OFFSET: 35,
   /** TTS 保護期閾值增量 */
   TTS_PROTECTION_THRESHOLD: 20,
   /** TTS 中等閾值增量 */

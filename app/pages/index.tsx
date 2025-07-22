@@ -39,6 +39,9 @@ export default function Home() {
   const [hasDetectedVoice, setHasDetectedVoice] = useState(false);
   const [waitingForVoiceAfterTts, setWaitingForVoiceAfterTts] = useState(false);
   
+  // 打斷相關狀態
+  const [isInterrupting, setIsInterrupting] = useState(false);
+  
   // 簡化的refs管理
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -61,6 +64,10 @@ export default function Home() {
   const baselineNoiseRef = useRef(10);
   const recordingStartTimeRef = useRef<number>(0); // 記錄開始錄音的時間
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // 打斷相關 refs
+  const isInterruptingRef = useRef(false);
+  const interruptCheckCountRef = useRef(0); // 用於連續檢測計數
 
   // 常數
   const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
@@ -334,6 +341,54 @@ export default function Home() {
     return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.VOICE_THRESHOLD_OFFSET;
   };
 
+  // 獲取搶話閾值
+  const getInterruptThreshold = () => {
+    if (thresholdCalculatorRef.current) {
+      return thresholdCalculatorRef.current.getInterruptThreshold();
+    }
+    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.INTERRUPT_THRESHOLD_OFFSET;
+  };
+
+  // 檢查是否應該打斷 TTS
+  const shouldInterruptTts = (currentVolume: number): boolean => {
+    const isTtsPlaying = ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : false;
+    if (!isTtsPlaying || isInterruptingRef.current || isListeningRef.current) {
+      return false;
+    }
+    
+    if (thresholdCalculatorRef.current) {
+      return thresholdCalculatorRef.current.shouldInterrupt(currentVolume, isTtsPlaying);
+    }
+    
+    // 降級處理：手動實現打斷邏輯
+    const baseThreshold = getVoiceThreshold();
+    const interruptThreshold = getInterruptThreshold();
+    return currentVolume >= baseThreshold && currentVolume >= interruptThreshold;
+  };
+
+  // 執行打斷 TTS 的動作
+  const performTtsInterrupt = () => {
+    console.log('🚨 檢測到搶話，打斷 TTS 播放');
+    setIsInterrupting(true);
+    isInterruptingRef.current = true;
+    
+    // 停止 TTS 播放
+    if (ttsManagerRef.current) {
+      ttsManagerRef.current.stop();
+    }
+    
+    // 重置打斷檢測計數
+    interruptCheckCountRef.current = 0;
+    
+    // 立即開始錄音
+    setTimeout(() => {
+      console.log('🎤 打斷後開始錄音');
+      setIsInterrupting(false);
+      isInterruptingRef.current = false;
+      startListening();
+    }, 100);
+  };
+
   // 自動滾動到最新消息
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -603,10 +658,19 @@ export default function Home() {
 
   const getVolumeBarColor = () => {
     if (isCalibrating) return '#ffc107';
+    if (isInterrupting) return '#e91e63'; // 粉紅色 - 打斷中
     if (!isListening && !waitingForVoiceAfterTts) return '#6c757d';
     
     const voiceThreshold = getVoiceThreshold();
     const silenceThreshold = getSilenceThreshold();
+    const interruptThreshold = getInterruptThreshold();
+    
+    // TTS 播放時的特殊顏色
+    if (ttsManagerRef.current && ttsManagerRef.current.isSpeaking()) {
+      if (currentVolume >= interruptThreshold) return '#ff5722'; // 深橙色 - 觸發搶話閾值
+      if (currentVolume >= voiceThreshold) return '#ff9800'; // 橙色 - 接近搶話閾值
+      return '#9c27b0'; // 紫色 - TTS 播放中
+    }
     
     if (currentVolume >= voiceThreshold) return '#28a745'; // 綠色 - 語音
     if (currentVolume >= silenceThreshold) return '#fd7e14'; // 橙色 - 中等
@@ -644,14 +708,37 @@ export default function Home() {
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         setCurrentVolume(average);
         
-        // 詳細的狀態調試信息（每秒輸出一次）
-        if (Math.round(Date.now() / 1000) % 5 === 0) {
-          console.log(`📊 狀態檢查: 
-            - waitingForVoiceAfterTts: ${waitingForVoiceAfterTtsRef.current}
-            - isListening: ${isListeningRef.current} 
-            - isSpeaking: ${ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : 'unknown'}
-            - 當前音量: ${average.toFixed(1)}
-            - 語音閾值: ${getVoiceThreshold().toFixed(1)}`);
+        // 詳細的狀態調試信息（每5秒輸出一次）
+        // if (Math.round(Date.now() / 1000) % 5 === 0) {
+        //   console.log(`📊 狀態檢查: 
+        //     - waitingForVoiceAfterTts: ${waitingForVoiceAfterTtsRef.current}
+        //     - isListening: ${isListeningRef.current} 
+        //     - isSpeaking: ${ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : 'unknown'}
+        //     - isInterrupting: ${isInterruptingRef.current}
+        //     - 當前音量: ${average.toFixed(1)}
+        //     - 語音閾值: ${getVoiceThreshold().toFixed(1)}
+        //     - 搶話閾值: ${getInterruptThreshold().toFixed(1)}`);
+        // }
+        
+        // 打斷邏輯：TTS 播放時檢測搶話
+        if (ttsManagerRef.current && ttsManagerRef.current.isSpeaking() && 
+            !isListeningRef.current && !isInterruptingRef.current) {
+          
+          if (shouldInterruptTts(average)) {
+            interruptCheckCountRef.current++;
+            console.log(`🔍 檢測到可能的搶話 (${interruptCheckCountRef.current}/3): 音量=${average.toFixed(1)}, 搶話閾值=${getInterruptThreshold().toFixed(1)}`);
+            
+            // 連續3次檢測到搶話才執行打斷（避免誤判）
+            if (interruptCheckCountRef.current >= 3) {
+              performTtsInterrupt();
+              return; // 執行打斷後直接返回，不繼續其他邏輯
+            }
+          } else {
+            // 重置計數器
+            if (interruptCheckCountRef.current > 0) {
+              interruptCheckCountRef.current = 0;
+            }
+          }
         }
         
         // 如果正在錄音，同時進行語音檢測邏輯
@@ -776,7 +863,17 @@ export default function Home() {
         {(isListening || isCalibrating || continuousVolumeCheckRef.current) && (
           <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
             靜音閾值: {getSilenceThreshold().toFixed(1)} | 語音閾值: {getVoiceThreshold().toFixed(1)}
-            {isSpeaking && (
+            {ttsManagerRef.current && ttsManagerRef.current.isSpeaking() && (
+              <span style={{ color: '#ff5722', marginLeft: '10px' }}>
+                | 搶話閾值: {getInterruptThreshold().toFixed(1)}
+              </span>
+            )}
+            {isInterrupting && (
+              <span style={{ color: '#e91e63', marginLeft: '10px' }}>
+                🚨 正在打斷TTS
+              </span>
+            )}
+            {isSpeaking && !isInterrupting && (
               <span style={{ color: '#9c27b0', marginLeft: '10px' }}>
                 🗣️ TTS播放中
               </span>
@@ -1054,7 +1151,8 @@ export default function Home() {
         <p>🔄 AI 回應後等待語音觸發，檢測到超過閾值的音量時自動開始錄音</p>
         <p>🧠 智慧對話記憶：AI 會記住最近的對話內容，讓交談更自然</p>
         <p>🎭 真人化回應：使用專門的提示詞讓 AI 回答更像真人對話</p>
-        <p>� 持續音量監測：永遠監測環境音量，即使未開始對話也能看到音量變化</p>
+        <p>📊 持續音量監測：永遠監測環境音量，即使未開始對話也能看到音量變化</p>
+        <p>🚨 智慧打斷功能：TTS 播放時若檢測到搶話閾值，會自動停止播放並開始錄音</p>
       </div>
 
       <style jsx>{`
