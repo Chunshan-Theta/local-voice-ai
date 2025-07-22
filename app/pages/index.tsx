@@ -13,15 +13,13 @@ import {
   type TtsManager, 
   TTS_CONFIG 
 } from '../lib/ttsManager';
-
-interface Message {
-  id: string;
-  type: 'user' | 'ai';
-  content: string;
-  timestamp: Date;
-  isLoading?: boolean;
-  isPlaying?: boolean;
-}
+import { 
+  createReplyManager, 
+  type ReplyManager, 
+  type Message,
+  formatReplyError,
+  isAudioValid
+} from '../lib/replyManager';
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false);
@@ -51,6 +49,7 @@ export default function Home() {
   const noiseCalibrationRef = useRef<NoiseCalibrator | null>(null);
   const thresholdCalculatorRef = useRef<ThresholdCalculator | null>(null);
   const ttsManagerRef = useRef<TtsManager | null>(null);
+  const replyManagerRef = useRef<ReplyManager | null>(null);
 
   // 簡化的refs
   const isListeningRef = useRef(false);
@@ -121,8 +120,81 @@ export default function Home() {
       if (ttsManagerRef.current) {
         ttsManagerRef.current.destroy();
       }
+      if (replyManagerRef.current) {
+        replyManagerRef.current.destroy();
+      }
     };
   }, []);
+
+  // 初始化回覆管理器
+  useEffect(() => {
+    if (!replyManagerRef.current) {
+      replyManagerRef.current = createReplyManager(
+        {
+          maxHistoryLength: 10,
+          timeout: 60000,
+        },
+        {
+          onTranscriptionStart: (messageId) => {
+            const userMessage: Message = {
+              id: messageId,
+              type: 'user',
+              content: '正在轉錄語音...',
+              timestamp: new Date(),
+              isLoading: true,
+            };
+            setMessages(prev => [...prev, userMessage]);
+          },
+          onTranscriptionComplete: (messageId, transcript) => {
+            setMessages(prev => prev.map(msg => 
+              msg.id === messageId 
+                ? { ...msg, content: transcript, isLoading: false }
+                : msg
+            ));
+          },
+          onReplyStart: (messageId) => {
+            const aiMessage: Message = {
+              id: messageId,
+              type: 'ai',
+              content: '正在思考回覆...',
+              timestamp: new Date(),
+              isLoading: true,
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          },
+          onReplyComplete: (messageId, reply) => {
+            setMessages(prev => prev.map(msg => 
+              msg.id === messageId 
+                ? { ...msg, content: reply, isLoading: false }
+                : msg
+            ));
+          },
+          onError: (error, messageId) => {
+            console.error('Reply 錯誤:', error);
+            setError(formatReplyError(error));
+            
+            // 移除loading中的消息
+            if (messageId) {
+              setMessages(prev => prev.filter(msg => msg.id !== messageId || !msg.isLoading));
+            }
+          },
+          onSpeakReply: (text, messageId) => {
+            if (ttsEnabled && text.trim()) {
+              setTimeout(() => {
+                speakText(text, messageId);
+              }, 500);
+            }
+          }
+        }
+      );
+    }
+
+    return () => {
+      if (replyManagerRef.current) {
+        replyManagerRef.current.destroy();
+      }
+    };
+  }, [ttsEnabled]);
 
   // 簡化噪音校準器初始化
   useEffect(() => {
@@ -176,30 +248,6 @@ export default function Home() {
     // 簡化的降級處理邏輯
     return baselineNoiseRef.current + 1;
   };
-
-  // 當有新的 AI 回應時，檢查是否需要自動重新開始錄音
-  useEffect(() => {
-    if (messages.length > 0 && conversationStarted && !loading) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.type === 'ai' && !lastMessage.isLoading) {
-        // 檢查TTS是否啟用，如果啟用則等待TTS完成後再開始錄音
-        if (ttsEnabled && lastMessage.content.trim()) {
-          console.log('🗣️ AI回應完成，TTS將自動朗讀，等待TTS結束後開始錄音');
-          // TTS結束時會自動開始錄音
-        } else {
-          // 如果沒有啟用TTS，直接開始錄音
-          console.log('🎤 TTS未啟用，直接開始錄音');
-          const timer = setTimeout(() => {
-            if (!isListeningRef.current) {
-              startListening();
-            }
-          }, 1000);
-          
-          return () => clearTimeout(timer);
-        }
-      }
-    }
-  }, [messages, conversationStarted, loading, ttsEnabled]);
 
   // 自動滾動到最新消息
   useEffect(() => {
@@ -403,103 +451,21 @@ export default function Home() {
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       
-      if (audioBlob.size < 1000) {
+      if (!isAudioValid(audioBlob)) {
         setLoading(false);
         return;
       }
 
-      // 先添加一個用戶消息（loading狀態）
-      const userMessageId = `user_${Date.now()}`;
-      const userMessage: Message = {
-        id: userMessageId,
-        type: 'user',
-        content: '正在轉錄語音...',
-        timestamp: new Date(),
-        isLoading: true,
-      };
-      setMessages(prev => [...prev, userMessage]);
-
-      // 步驟1：語音轉錄
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'audio.webm');
-
-      const transcribeResponse = await axios.post('/api/transcribe', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 30000,
-      });
-
-      const { transcript } = transcribeResponse.data;
-
-      // 更新用戶消息的轉錄結果
-      setMessages(prev => prev.map(msg => 
-        msg.id === userMessageId 
-          ? { ...msg, content: transcript, isLoading: false }
-          : msg
-      ));
-
-      // 如果轉錄結果為空，不進行AI回覆
-      if (!transcript.trim() || transcript === '（未識別到語音）') {
-        setLoading(false);
-        return;
+      if (!replyManagerRef.current) {
+        throw new Error('回覆管理器未初始化');
       }
 
-      // 步驟4：添加AI回覆消息（loading狀態）
-      const aiMessageId = `ai_${Date.now()}`;
-      const aiMessage: Message = {
-        id: aiMessageId,
-        type: 'ai',
-        content: '正在思考回覆...',
-        timestamp: new Date(),
-        isLoading: true,
-      };
-      setMessages(prev => [...prev, aiMessage]);
-
-      // 步驟3：構建對話歷史（不包含當前對話）
-      const conversationHistory: ConversationMessage[] = messages
-        .filter(msg => !msg.isLoading && msg.content.trim() && msg.content !== '正在轉錄語音...' && msg.content !== '正在思考回覆...')
-        .slice(-10) // 只保留最近 10 條消息避免過長
-        .map(msg => ({
-          role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
-          content: msg.content
-        }));
-
-      console.log('Conversation history:', conversationHistory);
-
-      // 步驟4：獲取AI回覆
-      const replyResponse = await axios.post('/api/reply', {
-        message: transcript,
-        conversationHistory: conversationHistory,
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 60000,
-      });
-
-      const { reply } = replyResponse.data;
-
-      // 更新AI消息的回覆結果
-      setMessages(prev => prev.map(msg => 
-        msg.id === aiMessageId 
-          ? { ...msg, content: reply, isLoading: false }
-          : msg
-      ));
-
-      // 如果啟用了TTS，自動朗讀AI回覆
-      if (ttsEnabled && reply.trim()) {
-        setTimeout(() => {
-          speakText(reply, aiMessageId);
-        }, 500); // 稍微延遲以確保UI更新完成
-      }
+      // 使用replyManager處理音頻
+      await replyManagerRef.current.processAudio(audioBlob, messages);
 
     } catch (err) {
       console.error('處理錯誤:', err);
-      setError(err instanceof Error ? err.message : '處理失敗');
-      
-      // 移除loading中的消息
-      setMessages(prev => prev.filter(msg => !msg.isLoading));
+      // 錯誤處理已在replyManager的callback中處理
     } finally {
       setLoading(false);
     }
