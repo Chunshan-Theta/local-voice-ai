@@ -59,10 +59,12 @@ export default function Home() {
   const waitingForVoiceAfterTtsRef = useRef(false);
   const conversationStartedRef = useRef(false);
   const baselineNoiseRef = useRef(10);
+  const recordingStartTimeRef = useRef<number>(0); // 記錄開始錄音的時間
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 常數
   const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
+  const MIN_RECORDING_DURATION = 1000; // 最小錄音時間：1秒
 
   // 簡化TTS管理器初始化
   useEffect(() => {
@@ -80,7 +82,15 @@ export default function Home() {
             console.log('🔇 TTS開始播放');
             // 停止當前錄音（如果有的話）
             if (isListeningRef.current) {
+              console.log('⏹️ TTS開始時停止錄音');
               stopListening();
+            }
+            
+            // TTS開始時清除等待狀態
+            if (waitingForVoiceAfterTtsRef.current) {
+              console.log('🔄 TTS開始時清除等待語音觸發狀態');
+              setWaitingForVoiceAfterTts(false);
+              waitingForVoiceAfterTtsRef.current = false;
             }
             
             if (messageId) {
@@ -96,13 +106,15 @@ export default function Home() {
             // TTS結束後等待語音輸入
             setTimeout(() => {
               console.log('🎤 TTS結束後等待語音輸入');
-              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, loading=${loading}, isListeningRef=${isListeningRef.current}`);
+              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, isListeningRef=${isListeningRef.current}`);
               if (conversationStartedRef.current && !isListeningRef.current) {
                 console.log('✅ 條件滿足，設置等待語音觸發狀態');
                 setWaitingForVoiceAfterTts(true);
                 waitingForVoiceAfterTtsRef.current = true;
               } else {
                 console.log('❌ 條件不滿足，無法設置等待語音觸發狀態');
+                console.log(`  - conversationStarted: ${conversationStartedRef.current}`);
+                console.log(`  - isListening: ${isListeningRef.current}`);
               }
             }, 500);
           },
@@ -113,13 +125,15 @@ export default function Home() {
             // TTS錯誤後也要等待語音輸入
             setTimeout(() => {
               console.log('🎤 TTS錯誤後等待語音輸入');
-              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, loading=${loading}, isListeningRef=${isListeningRef.current}`);
+              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, isListeningRef=${isListeningRef.current}`);
               if (conversationStartedRef.current && !isListeningRef.current) {
                 console.log('✅ 條件滿足，設置等待語音觸發狀態');
                 setWaitingForVoiceAfterTts(true);
                 waitingForVoiceAfterTtsRef.current = true;
               } else {
                 console.log('❌ 條件不滿足，無法設置等待語音觸發狀態');
+                console.log(`  - conversationStarted: ${conversationStartedRef.current}`);
+                console.log(`  - isListening: ${isListeningRef.current}`);
               }
             }, 500);
           },
@@ -202,6 +216,31 @@ export default function Home() {
             if (messageId) {
               setMessages(prev => prev.filter(msg => msg.id !== messageId || !msg.isLoading));
             }
+            
+            // 如果是語音轉錄錯誤，更新用戶消息為錯誤提示，然後2秒後移除
+            if (error.includes('未識別到有效語音') && messageId) {
+              setMessages(prev => prev.map(msg => 
+                msg.id === messageId 
+                  ? { ...msg, content: '🔇 未識別到有效語音，請重新說話...', isLoading: false }
+                  : msg
+              ));
+              
+              // 2秒後移除這個錯誤消息
+              setTimeout(() => {
+                setMessages(prev => prev.filter(msg => msg.id !== messageId));
+              }, 2000);
+            }
+            
+            // 語音轉錄錯誤後，如果對話已開始，重新進入等待語音觸發狀態
+            setTimeout(() => {
+              if (conversationStartedRef.current && !isListeningRef.current) {
+                console.log('🔄 語音轉錄錯誤後，重新進入等待語音觸發狀態');
+                setWaitingForVoiceAfterTts(true);
+                waitingForVoiceAfterTtsRef.current = true;
+                // 清除錯誤信息，避免一直顯示
+                setError(null);
+              }
+            }, 2000); // 2秒後清除錯誤並重新進入等待狀態
           },
           onSpeakReply: (text, messageId) => {
             if (ttsEnabled && text.trim()) {
@@ -282,7 +321,7 @@ export default function Home() {
     if (thresholdCalculatorRef.current) {
       return thresholdCalculatorRef.current.getSilenceThreshold();
     }
-    return baselineNoiseRef.current + 0.5; // 降級處理
+    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.SILENCE_THRESHOLD_OFFSET; // 降級處理
   };
   
   const getVoiceThreshold = () => {
@@ -292,7 +331,7 @@ export default function Home() {
     }
     
     // 簡化的降級處理邏輯
-    return baselineNoiseRef.current + 1;
+    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.VOICE_THRESHOLD_OFFSET;
   };
 
   // 自動滾動到最新消息
@@ -437,12 +476,11 @@ export default function Home() {
       mediaRecorder.start(100);
       setIsListening(true);
       isListeningRef.current = true;
+      recordingStartTimeRef.current = Date.now(); // 記錄開始錄音的時間
       
-      if (!conversationStarted) {
-        console.log('✅ startListening 中設置 conversationStarted = true');
-        setConversationStarted(true);
-        conversationStartedRef.current = true;
-      }
+      // startListening 時不自動設置 conversationStarted
+      // 這應該由 startConversation 或其他明確的流程控制
+      console.log(`🎤 startListening: conversationStarted=${conversationStartedRef.current}`);
       
       // 持續音量監測應該已經在運行，不需要重複啟動
       
@@ -512,6 +550,29 @@ export default function Home() {
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       
+      // 檢查錄音時長
+      const recordingDuration = Date.now() - recordingStartTimeRef.current;
+      console.log(`🎤 錄音時長: ${recordingDuration}ms`);
+      
+      // 如果錄音時間小於最小時長，視為誤判
+      if (recordingDuration < MIN_RECORDING_DURATION) {
+        console.log(`⚠️ 錄音時間過短 (<${MIN_RECORDING_DURATION}ms)，視為誤判，重新進入等待語音觸發狀態`);
+        setError('錄音時間過短，請說話時間長一點');
+        setLoading(false);
+        
+        // 重新進入等待語音觸發狀態
+        if (conversationStartedRef.current) {
+          setTimeout(() => {
+            console.log('🔄 短錄音後重新進入等待語音觸發狀態');
+            setWaitingForVoiceAfterTts(true);
+            waitingForVoiceAfterTtsRef.current = true;
+            // 清除錯誤提示
+            setError(null);
+          }, 2000); // 2秒後清除錯誤並重新進入等待狀態
+        }
+        return;
+      }
+      
       if (!isAudioValid(audioBlob)) {
         setLoading(false);
         return;
@@ -526,9 +587,17 @@ export default function Home() {
 
     } catch (err) {
       console.error('處理錯誤:', err);
-      // 錯誤處理已在replyManager的callback中處理
+      // 錯誤處理已在replyManager的callback中處理，這裡不需要重複處理
+      // 但如果是網絡錯誤等其他錯誤，也要確保能重新進入等待狀態
     } finally {
       setLoading(false);
+      
+      // 音頻處理完成後，如果對話已開始且沒有在錄音，準備等待TTS完成或重新等待語音觸發
+      if (conversationStartedRef.current && !isListeningRef.current) {
+        console.log('🎤 音頻處理完成，準備等待TTS播放和語音觸發');
+        // 如果沒有錯誤，等待狀態將由TTS的onEnd回調設置
+        // 如果有錯誤，等待狀態將由replyManager的onError回調設置
+      }
     }
   };
 
@@ -613,7 +682,12 @@ export default function Home() {
         // 如果正在等待TTS後的語音輸入，檢測是否超過閾值
         if (waitingForVoiceAfterTtsRef.current && !isListeningRef.current) {
           const voiceThreshold = getVoiceThreshold();
-          console.log(`🔍 等待語音檢測中... 當前音量: ${average.toFixed(1)}, 閾值: ${voiceThreshold.toFixed(1)}`);
+          // 減少日志輸出頻率，只在檢測到語音或每隔幾秒輸出一次
+          const shouldLog = average >= voiceThreshold || (Math.round(Date.now() / 1000) % 3 === 0);
+          if (shouldLog) {
+            console.log(`🔍 等待語音檢測中... 當前音量: ${average.toFixed(1)}, 閾值: ${voiceThreshold.toFixed(1)}`);
+          }
+          
           if (average >= voiceThreshold) {
             console.log('🎤 檢測到語音，自動開始錄音');
             setWaitingForVoiceAfterTts(false);
@@ -855,12 +929,31 @@ export default function Home() {
       {error && (
         <div style={{
           padding: '1rem',
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
+          backgroundColor: (error.includes('未識別到有效語音') || error.includes('錄音時間過短')) ? '#fff3cd' : '#f8d7da',
+          color: (error.includes('未識別到有效語音') || error.includes('錄音時間過短')) ? '#856404' : '#721c24',
           borderRadius: '4px',
-          marginBottom: '1rem'
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
         }}>
-          錯誤：{error}
+          {error.includes('未識別到有效語音') ? (
+            <>
+              🎤 {error}，請重新說話...
+              <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: 'auto' }}>
+                (2秒後自動恢復)
+              </span>
+            </>
+          ) : error.includes('錄音時間過短') ? (
+            <>
+              ⏱️ {error}
+              <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: 'auto' }}>
+                (2秒後自動恢復)
+              </span>
+            </>
+          ) : (
+            <>錯誤：{error}</>
+          )}
         </div>
       )}
 

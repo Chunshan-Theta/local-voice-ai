@@ -197,14 +197,14 @@ export class ThresholdCalculator {
    * 計算靜音閾值
    */
   getSilenceThreshold(): number {
-    return this.baselineNoise + 0.5;
+    return this.baselineNoise + NOISE_CALIBRATION_CONFIG.SILENCE_THRESHOLD_OFFSET;
   }
 
   /**
    * 計算語音閾值（正常模式）
    */
   getVoiceThreshold(): number {
-    return this.baselineNoise + 1;
+    return this.baselineNoise + NOISE_CALIBRATION_CONFIG.VOICE_THRESHOLD_OFFSET;
   }
 
   /**
@@ -218,24 +218,24 @@ export class ThresholdCalculator {
     
     // TTS剛開始播放的前1秒使用較高閾值避免初始波動誤判
     const timeSinceStart = Date.now() - ttsStartTime;
-    if (timeSinceStart < 1000) {
-      return this.baselineNoise + 20; // 前1秒使用較高閾值
+    if (timeSinceStart < NOISE_CALIBRATION_CONFIG.TTS_PROTECTION_PERIOD) {
+      return this.baselineNoise + NOISE_CALIBRATION_CONFIG.TTS_PROTECTION_THRESHOLD; // 保護期使用較高閾值
     }
     
     // 動態計算：基於收集到的TTS音量數據
-    if (ttsVolumeSamples.length > 8) {
+    if (ttsVolumeSamples.length > NOISE_CALIBRATION_CONFIG.TTS_MIN_SAMPLES) {
       const avgTtsVolume = ttsVolumeSamples.reduce((sum, vol) => sum + vol, 0) / ttsVolumeSamples.length;
       const maxTtsVolume = Math.max(...ttsVolumeSamples);
-      // 使用平衡的倍數：取平均值的1.4倍或最大值的1.2倍，選較大者
+      // 使用平衡的倍數：取平均值的倍數或最大值的倍數，選較大者
       const balancedThreshold = Math.max(
-        avgTtsVolume * 1.4,
-        maxTtsVolume * 1.2,
-        this.baselineNoise + 30
+        avgTtsVolume * NOISE_CALIBRATION_CONFIG.TTS_AVG_MULTIPLIER,
+        maxTtsVolume * NOISE_CALIBRATION_CONFIG.TTS_MAX_MULTIPLIER,
+        this.baselineNoise + NOISE_CALIBRATION_CONFIG.TTS_MIN_DYNAMIC_THRESHOLD
       );
       return balancedThreshold;
     }
     // 如果還沒收集到足夠數據，使用中等固定值
-    return this.baselineNoise + 15;
+    return this.baselineNoise + NOISE_CALIBRATION_CONFIG.TTS_MEDIUM_THRESHOLD;
   }
 
   /**
@@ -277,9 +277,9 @@ export const NOISE_CALIBRATION_CONFIG = {
   /** 預設採樣間隔（毫秒） */
   DEFAULT_SAMPLING_INTERVAL: 50,
   /** 靜音閾值增量 */
-  SILENCE_THRESHOLD_OFFSET: 0.5,
+  SILENCE_THRESHOLD_OFFSET: 10,
   /** 正常語音閾值增量 */
-  VOICE_THRESHOLD_OFFSET: 1,
+  VOICE_THRESHOLD_OFFSET: 15,
   /** TTS 保護期閾值增量 */
   TTS_PROTECTION_THRESHOLD: 20,
   /** TTS 中等閾值增量 */
