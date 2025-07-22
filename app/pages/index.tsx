@@ -31,52 +31,45 @@ export default function Home() {
   const [conversationStarted, setConversationStarted] = useState(false);
   
   // TTS 相關狀態
-  const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [ttsVoice, setTtsVoice] = useState<SpeechSynthesisVoice | null>(null);
-  const [ttsRate, setTtsRate] = useState(1.0);
-  const [ttsVolume, setTtsVolume] = useState(0.8);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [ttsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   
-  // 環境音檢測相關狀態
+  // 音頻檢測相關狀態
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [baselineNoise, setBaselineNoise] = useState<number>(10);
   const [currentVolume, setCurrentVolume] = useState<number>(0);
   const [calibrationProgress, setCalibrationProgress] = useState<number>(0);
   const [hasDetectedVoice, setHasDetectedVoice] = useState(false);
   
+  // 簡化的refs管理
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const volumeCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const volumeCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const noiseCalibrationRef = useRef<NoiseCalibrator | null>(null);
   const thresholdCalculatorRef = useRef<ThresholdCalculator | null>(null);
   const ttsManagerRef = useRef<TtsManager | null>(null);
 
-  // 語音活動檢測參數
-  const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
-  const MIN_RECORDING_TIME = 1000; // 最短錄音時間 1秒
-
-  // 音頻流管理
-  const audioStreamRef = useRef<MediaStream | null>(null);
-
+  // 簡化的refs
   const isListeningRef = useRef(false);
   const hasDetectedVoiceRef = useRef(false);
   const baselineNoiseRef = useRef(10);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 初始化TTS管理器
+  // 常數
+  const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
+
+  // 簡化TTS管理器初始化
   useEffect(() => {
     if (!ttsManagerRef.current) {
       ttsManagerRef.current = createTtsManager(
         {
           enabled: ttsEnabled,
-          voice: ttsVoice,
-          rate: ttsRate,
-          volume: ttsVolume,
+          voice: null,
+          rate: 1.0,
+          volume: 0.8,
           pitch: 1.0
         },
         {
@@ -122,16 +115,6 @@ export default function Home() {
           }
         }
       );
-
-      // 獲取可用語音列表
-      const voices = ttsManagerRef.current.getAvailableVoices();
-      setAvailableVoices(voices);
-      
-      // 如果自動選擇了語音，同步狀態
-      const currentVoice = ttsManagerRef.current.getOptions().voice;
-      if (currentVoice) {
-        setTtsVoice(currentVoice);
-      }
     }
 
     return () => {
@@ -141,20 +124,7 @@ export default function Home() {
     };
   }, []);
 
-  // 同步TTS設置到管理器
-  useEffect(() => {
-    if (ttsManagerRef.current) {
-      ttsManagerRef.current.updateOptions({
-        enabled: ttsEnabled,
-        voice: ttsVoice,
-        rate: ttsRate,
-        volume: ttsVolume,
-        pitch: 1.0
-      });
-    }
-  }, [ttsEnabled, ttsVoice, ttsRate, ttsVolume]);
-
-  // 初始化噪音校準器和閾值計算器
+  // 簡化噪音校準器初始化
   useEffect(() => {
     if (!noiseCalibrationRef.current) {
       noiseCalibrationRef.current = createNoiseCalibrator({
@@ -166,12 +136,10 @@ export default function Home() {
           setCurrentVolume(currentVolume);
         },
         onComplete: (baselineNoise) => {
-          setBaselineNoise(baselineNoise);
           baselineNoiseRef.current = baselineNoise;
           setIsCalibrating(false);
           setCurrentVolume(0);
           
-          // 初始化或更新閾值計算器
           if (!thresholdCalculatorRef.current) {
             thresholdCalculatorRef.current = createThresholdCalculator(baselineNoise);
           } else {
@@ -186,9 +154,8 @@ export default function Home() {
       });
     }
 
-    // 如果還沒有閾值計算器，用當前基線噪音初始化
     if (!thresholdCalculatorRef.current) {
-      thresholdCalculatorRef.current = createThresholdCalculator(baselineNoise);
+      thresholdCalculatorRef.current = createThresholdCalculator(baselineNoiseRef.current);
     }
   }, []);
 
@@ -253,75 +220,56 @@ export default function Home() {
     setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
   };
 
-  // 創建音頻流
+  // 簡化音頻流創建
   const createAudioStream = async () => {
     if (audioStreamRef.current) {
-      // 如果已經有流，先清理
       audioStreamRef.current.getTracks().forEach(track => track.stop());
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
-        echoCancellation: true,  // 啟用回音消除，避免錄到TTS聲音
-        noiseSuppression: true,  // 啟用噪音抑制
-        autoGainControl: true,   // 啟用自動增益控制
-        sampleRate: 16000,       // 設置合適的採樣率
-        channelCount: 1,         // 單聲道
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 16000,
+        channelCount: 1,
       } 
     });
 
     audioStreamRef.current = stream;
-    streamRef.current = stream;
-    
-    console.log('🎤 創建音頻流');
     return stream;
   };
 
-  // 設置音頻分析器 - 校準和錄音共用
+  // 簡化音頻分析器設置
   const setupAudioAnalyser = (stream: MediaStream) => {
-    // 只有在沒有音頻上下文或上下文已關閉時才創建新的
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-      console.log('🔄 創建新的音頻上下文');
       audioContextRef.current = new AudioContext();
-    } else {
-      console.log('✅ 復用現有音頻上下文');
     }
     
-    // 只有在沒有分析器時才創建新的
     if (!analyserRef.current) {
-      console.log('🔄 創建新的音頻分析器');
       analyserRef.current = audioContextRef.current.createAnalyser();
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
       
       analyserRef.current.fftSize = 512;
       analyserRef.current.smoothingTimeConstant = 0.8;
-      
-      console.log('🔊 音頻分析器設置完成，頻率數據大小:', analyserRef.current.frequencyBinCount);
-    } else {
-      console.log('✅ 復用現有音頻分析器');
     }
     
     return analyserRef.current;
   };
 
-  // 環境音校準 - 使用噪音校準器模組
+  // 簡化環境音校準
   const calibrateEnvironmentalNoise = async () => {
     try {
       setIsCalibrating(true);
       setCalibrationProgress(0);
-      
-      // 校準時必須停止TTS播放，因為需要安靜環境
       stopSpeaking();
       
-      // 創建統一音頻流
       const stream = await createAudioStream();
       const analyser = setupAudioAnalyser(stream);
 
-      // 使用噪音校準器進行校準
       if (noiseCalibrationRef.current) {
         await noiseCalibrationRef.current.startCalibration(analyser);
-        console.log(`✅ 環境音校準完成，語音閾值: ${(baselineNoiseRef.current + 1).toFixed(1)}`);
       } else {
         throw new Error('噪音校準器未初始化');
       }
@@ -335,11 +283,13 @@ export default function Home() {
 
   const startListening = async () => {
     try {
-      console.log('🎤 開始錄音');
+      // 開始錄音時停止TTS播放
+      if (isSpeaking) {
+        stopSpeaking();
+      }
       
       // 如果已經在錄音，先停止
       if (isListeningRef.current) {
-        console.log('⚠️ 已在錄音中，先停止現有錄音');
         stopListening();
       }
       
@@ -352,17 +302,10 @@ export default function Home() {
       let stream = audioStreamRef.current;
       
       if (!stream || !stream.active) {
-        console.log('⚠️ 創建新的音頻流');
         stream = await createAudioStream();
         setupAudioAnalyser(stream);
-      } else {
-        console.log('✅ 使用現有音頻流');
-        
-        // 檢查音頻上下文是否還活躍
-        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-          console.log('🔄 重新設置音頻分析器');
-          setupAudioAnalyser(stream);
-        }
+      } else if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        setupAudioAnalyser(stream);
       }
 
       // 創建MediaRecorder
@@ -392,13 +335,10 @@ export default function Home() {
         setConversationStarted(true);
       }
       
-      // 啟動音量監控（如果還沒有啟動的話）
+      // 啟動音量監控
       if (!volumeCheckIntervalRef.current) {
-        console.log('🔄 啟動音量監控');
         startVolumeMonitoring();
       }
-      
-      console.log('🎤 錄音已啟動');
       
     } catch (err) {
       console.error('錄音錯誤:', err);
@@ -407,46 +347,32 @@ export default function Home() {
   };
 
   const stopListening = () => {
-    console.log('🛑 stopListening 被調用');
-    
     setIsListening(false);
     isListeningRef.current = false;
     setCurrentVolume(0);
     setHasDetectedVoice(false);
     hasDetectedVoiceRef.current = false;
     
-    // 不停止音量監控！只清理錄音相關的計時器
     if (silenceTimerRef.current) {
-      console.log('🕐 清理靜音計時器:', silenceTimerRef.current);
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-    
-    // 重要：保持音量監控運行，只停止錄音
-    console.log('🔄 停止錄音但保持音頻資源和音量監控活躍');
   };
 
   const stopRecording = () => {
-    console.log('🎬 stopRecording 被調用');
-    
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      console.log('📹 停止 MediaRecorder');
       mediaRecorderRef.current.stop();
-    } else {
-      console.log('⚠️ MediaRecorder 不在錄音狀態:', mediaRecorderRef.current?.state);
     }
-    
     stopListening();
   };
 
   const endConversation = () => {
     setConversationStarted(false);
     stopRecording();
-    stopVolumeMonitoring(); // 對話結束時才真正停止音量監控
-    stopSpeaking(); // 停止TTS播放
+    stopVolumeMonitoring();
+    stopSpeaking();
     setMessages([]);
     
-    // 對話結束時才真正關閉所有音頻資源
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
@@ -456,24 +382,16 @@ export default function Home() {
       audioContextRef.current.close();
     }
     
-    // 清理引用
     analyserRef.current = null;
     audioContextRef.current = null;
-    streamRef.current = null;
-    
-    console.log('🛑 對話結束，所有音頻資源已清理');
   };
 
   const startConversation = async () => {
     await calibrateEnvironmentalNoise();
-    // 校準完成後立即開始持續音量監控
     setTimeout(() => {
-      console.log('🔄 校準完成，開始持續音量監控和錄音');
-      // 先啟動音量監控
       if (!volumeCheckIntervalRef.current) {
         startVolumeMonitoring();
       }
-      // 然後開始錄音
       startListening();
     }, 500);
   };
@@ -606,76 +524,41 @@ export default function Home() {
 
   // 簡化的音量檢測循環
   const startVolumeMonitoring = () => {
-    console.log('🔄 啟動音量監控');
-    
     if (volumeCheckIntervalRef.current) {
-      console.log('🛑 清除舊的音量監控');
       clearInterval(volumeCheckIntervalRef.current);
     }
 
     volumeCheckIntervalRef.current = setInterval(() => {
-      const hasAnalyser = !!analyserRef.current;
-      const currentIsListening = isListeningRef.current;
-      
-      // 只有在錄音模式且有分析器時才進行音量檢測
-      if (!hasAnalyser || !currentIsListening) {
-        return;
-      }
+      if (!analyserRef.current || !isListeningRef.current) return;
 
-      const dataArray = new Uint8Array(analyserRef.current!.frequencyBinCount);
-      analyserRef.current!.getByteFrequencyData(dataArray);
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(dataArray);
       
-      // 計算音量
-      const sum = Array.from(dataArray).reduce((a, b) => a + b, 0);
-      const average = sum / dataArray.length;
-      
+      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
       setCurrentVolume(average);
       
-      const silenceThreshold = getSilenceThreshold();
       const voiceThreshold = getVoiceThreshold();
-      
-      // 語音檢測邏輯 - 簡化版
       const isVoiceDetected = average >= voiceThreshold;
       
       if (isVoiceDetected) {
         if (!hasDetectedVoiceRef.current) {
-          console.log('� 檢測到語音！', { 
-            average: average.toFixed(1), 
-            voiceThreshold: voiceThreshold.toFixed(1)
-          });
           setHasDetectedVoice(true);
           hasDetectedVoiceRef.current = true;
         }
         
-        // 清除靜音計時器
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = null;
-          console.log('🔄 檢測到語音，取消靜音倒數');
         }
-      } else if (hasDetectedVoiceRef.current && currentIsListening) {
-        // 開始靜音倒數
+      } else if (hasDetectedVoiceRef.current) {
         if (!silenceTimerRef.current) {
-          console.log('🔴 開始靜音倒數...', { 
-            currentVolume: average.toFixed(1), 
-            voiceThreshold: voiceThreshold.toFixed(1)
-          });
-          
           silenceTimerRef.current = setTimeout(() => {
-            console.log('⏰ 靜音時間到，自動發送錄音');
             silenceTimerRef.current = null;
-            
-            try {
-              stopRecording();
-            } catch (error) {
-              console.error('❌ stopRecording 執行錯誤:', error);
-            }
+            stopRecording();
           }, SILENCE_DURATION);
         }
       }
     }, 100);
-    
-    console.log('✅ 音量監控定時器已設置');
   };
 
   const stopVolumeMonitoring = () => {
@@ -753,92 +636,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* TTS 設置 */}
-      <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', display: 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input
-              type="checkbox"
-              id="tts-enabled"
-              checked={ttsEnabled}
-              onChange={(e) => setTtsEnabled(e.target.checked)}
-            />
-            <label htmlFor="tts-enabled" style={{ fontSize: '0.9rem', color: '#666' }}>
-              🗣️ 自動朗讀
-            </label>
-          </div>
-
-          {availableVoices.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.9rem', color: '#666' }}>語音:</label>
-              <select
-                value={ttsVoice?.name || ''}
-                onChange={(e) => {
-                  const voice = availableVoices.find(v => v.name === e.target.value);
-                  setTtsVoice(voice || null);
-                }}
-                style={{ fontSize: '0.8rem', padding: '0.25rem' }}
-              >
-                {availableVoices.map((voice) => (
-                  <option key={voice.name} value={voice.name}>
-                    {voice.name} ({voice.lang})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.9rem', color: '#666' }}>語速:</label>
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={ttsRate}
-              onChange={(e) => setTtsRate(parseFloat(e.target.value))}
-              style={{ width: '60px' }}
-            />
-            <span style={{ fontSize: '0.8rem', color: '#666', minWidth: '30px' }}>
-              {ttsRate.toFixed(1)}x
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.9rem', color: '#666' }}>音量:</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={ttsVolume}
-              onChange={(e) => setTtsVolume(parseFloat(e.target.value))}
-              style={{ width: '60px' }}
-            />
-            <span style={{ fontSize: '0.8rem', color: '#666', minWidth: '30px' }}>
-              {Math.round(ttsVolume * 100)}%
-            </span>
-          </div>
-
-          {isSpeaking && (
-            <button
-              onClick={stopSpeaking}
-              style={{
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.8rem',
-                backgroundColor: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              🔇 停止朗讀
-            </button>
-          )}
-        </div>
-      </div>
-      
       {/* 控制按鈕 */}
       <div style={{ marginBottom: '1rem' }}>
         {isCalibrating ? (
