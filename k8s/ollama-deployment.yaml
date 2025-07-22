@@ -22,7 +22,7 @@ spec:
             - |
               ollama serve &
               sleep 15
-              ollama pull gemma3:1b
+              ollama pull gemma3:12b
               wait
           ports:
             - containerPort: 11434
@@ -46,5 +46,6 @@ spec:
               cpu: "1"
       volumes:
         - name: ollama-storage
-          persistentVolumeClaim:
-            claimName: ollama-pvc
+          emptyDir:
+            medium: Memory  # 使用內存作為存儲
+            sizeLimit: 16Gi  # 限制大小，因為 gemma3:12b 模型較大

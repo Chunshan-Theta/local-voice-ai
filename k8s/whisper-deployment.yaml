@@ -44,6 +44,8 @@ spec:
               value: "0"
             - name: NVIDIA_VISIBLE_DEVICES
               value: "all"
+            - name: WHISPER_MODEL
+              value: "medium"
           resources:
             requests:
               memory: "8Gi"
@@ -52,11 +54,12 @@ spec:
             limits:
               memory: "32Gi"
               cpu: "4"
-              nvidia.com/gpu: "1"
+              nvidia.com/gpu: "1"  # 改為 1，因為通常一個 pod 用一個 GPU
           volumeMounts:
             - name: hf-cache
               mountPath: /cache
       volumes:
         - name: hf-cache
-          persistentVolumeClaim:
-            claimName: hf-cache-pvc
+          emptyDir:
+            medium: Memory  # 使用內存作為緩存
+            sizeLimit: 8Gi  # 限制大小

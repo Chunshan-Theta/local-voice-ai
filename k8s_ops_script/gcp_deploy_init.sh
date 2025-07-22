@@ -44,7 +44,7 @@ if ! gcloud container node-pools list --cluster $CLUSTER_NAME --zone $ZONE | gre
         --disk-size 100 \
         --enable-autoscaling \
         --min-nodes 1 \
-        --max-nodes 3
+        --max-nodes 6
 fi
 
 # 获取集群凭证
