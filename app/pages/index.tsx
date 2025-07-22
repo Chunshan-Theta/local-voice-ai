@@ -43,6 +43,7 @@ export default function Home() {
   const audioChunksRef = useRef<Blob[]>([]);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const volumeCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const continuousVolumeCheckRef = useRef<NodeJS.Timeout | null>(null); // 新增：持續音量監測
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -123,6 +124,17 @@ export default function Home() {
       if (replyManagerRef.current) {
         replyManagerRef.current.destroy();
       }
+      // 組件卸載時才停止持續監測
+      stopContinuousVolumeMonitoring();
+      
+      // 清理音頻資源
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
     };
   }, []);
 
@@ -196,7 +208,7 @@ export default function Home() {
     };
   }, [ttsEnabled]);
 
-  // 簡化噪音校準器初始化
+  // 初始化並啟動持續音量監測
   useEffect(() => {
     if (!noiseCalibrationRef.current) {
       noiseCalibrationRef.current = createNoiseCalibrator({
@@ -210,18 +222,22 @@ export default function Home() {
         onComplete: (baselineNoise) => {
           baselineNoiseRef.current = baselineNoise;
           setIsCalibrating(false);
-          setCurrentVolume(0);
           
           if (!thresholdCalculatorRef.current) {
             thresholdCalculatorRef.current = createThresholdCalculator(baselineNoise);
           } else {
             thresholdCalculatorRef.current.updateBaselineNoise(baselineNoise);
           }
+          
+          // 校準完成後自動開始持續音量監測
+          startContinuousVolumeMonitoring();
         },
         onError: (error) => {
           console.error('校準錯誤:', error);
           setError('校準失敗，將使用預設值');
           setIsCalibrating(false);
+          // 即使校準失敗也要開始音量監測
+          startContinuousVolumeMonitoring();
         }
       });
     }
@@ -229,6 +245,23 @@ export default function Home() {
     if (!thresholdCalculatorRef.current) {
       thresholdCalculatorRef.current = createThresholdCalculator(baselineNoiseRef.current);
     }
+
+    // 組件初始化時就開始持續音量監測
+    const initializeContinuousMonitoring = async () => {
+      try {
+        await createAudioStream();
+        startContinuousVolumeMonitoring();
+      } catch (error) {
+        console.log('等待用戶交互後再啟動音量監測');
+      }
+    };
+    
+    initializeContinuousMonitoring();
+
+    // 清理函數
+    return () => {
+      stopContinuousVolumeMonitoring();
+    };
   }, []);
 
   // 計算動態閾值 - 使用閾值計算器
@@ -313,7 +346,12 @@ export default function Home() {
       setCalibrationProgress(0);
       stopSpeaking();
       
-      const stream = await createAudioStream();
+      // 使用現有的音頻流或創建新的
+      let stream = audioStreamRef.current;
+      if (!stream || !stream.active) {
+        stream = await createAudioStream();
+      }
+      
       const analyser = setupAudioAnalyser(stream);
 
       if (noiseCalibrationRef.current) {
@@ -326,6 +364,10 @@ export default function Home() {
       console.error('校準錯誤:', err);
       setError('校準失敗，將使用預設值');
       setIsCalibrating(false);
+      // 即使校準失敗也要確保持續監測正在運行
+      if (!continuousVolumeCheckRef.current) {
+        startContinuousVolumeMonitoring();
+      }
     }
   };
 
@@ -383,10 +425,7 @@ export default function Home() {
         setConversationStarted(true);
       }
       
-      // 啟動音量監控
-      if (!volumeCheckIntervalRef.current) {
-        startVolumeMonitoring();
-      }
+      // 持續音量監測應該已經在運行，不需要重複啟動
       
     } catch (err) {
       console.error('錄音錯誤:', err);
@@ -417,29 +456,20 @@ export default function Home() {
   const endConversation = () => {
     setConversationStarted(false);
     stopRecording();
-    stopVolumeMonitoring();
+    stopVolumeMonitoring(); // 只停止錄音相關的監測
     stopSpeaking();
     setMessages([]);
     
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null;
-    }
-    
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
-    }
-    
-    analyserRef.current = null;
-    audioContextRef.current = null;
+    // 不關閉音頻流和分析器，保持持續監測
+    // 只重置語音檢測狀態
+    setHasDetectedVoice(false);
+    hasDetectedVoiceRef.current = false;
   };
 
   const startConversation = async () => {
     await calibrateEnvironmentalNoise();
     setTimeout(() => {
-      if (!volumeCheckIntervalRef.current) {
-        startVolumeMonitoring();
-      }
+      // 持續音量監測應該已經在運行
       startListening();
     }, 500);
   };
@@ -488,46 +518,82 @@ export default function Home() {
     return Math.min((currentVolume / maxDisplayVolume) * 100, 100);
   };
 
-  // 簡化的音量檢測循環
-  const startVolumeMonitoring = () => {
-    if (volumeCheckIntervalRef.current) {
-      clearInterval(volumeCheckIntervalRef.current);
-    }
-
-    volumeCheckIntervalRef.current = setInterval(() => {
-      if (!analyserRef.current || !isListeningRef.current) return;
-
-      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-      analyserRef.current.getByteFrequencyData(dataArray);
-      
-      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-      setCurrentVolume(average);
-      
-      const voiceThreshold = getVoiceThreshold();
-      const isVoiceDetected = average >= voiceThreshold;
-      
-      if (isVoiceDetected) {
-        if (!hasDetectedVoiceRef.current) {
-          setHasDetectedVoice(true);
-          hasDetectedVoiceRef.current = true;
-        }
-        
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-      } else if (hasDetectedVoiceRef.current) {
-        if (!silenceTimerRef.current) {
-          silenceTimerRef.current = setTimeout(() => {
-            silenceTimerRef.current = null;
-            stopRecording();
-          }, SILENCE_DURATION);
-        }
+  // 持續音量監測 - 獨立於錄音狀態
+  const startContinuousVolumeMonitoring = async () => {
+    try {
+      // 如果已經在監測，先停止
+      if (continuousVolumeCheckRef.current) {
+        clearInterval(continuousVolumeCheckRef.current);
       }
-    }, 100);
+
+      // 確保有音頻流和分析器
+      let stream = audioStreamRef.current;
+      if (!stream || !stream.active) {
+        stream = await createAudioStream();
+        setupAudioAnalyser(stream);
+      } else if (!analyserRef.current) {
+        setupAudioAnalyser(stream);
+      }
+
+      continuousVolumeCheckRef.current = setInterval(() => {
+        if (!analyserRef.current) return;
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        setCurrentVolume(average);
+        
+        // 如果正在錄音，同時進行語音檢測邏輯
+        if (isListeningRef.current) {
+          const voiceThreshold = getVoiceThreshold();
+          const isVoiceDetected = average >= voiceThreshold;
+          
+          if (isVoiceDetected) {
+            if (!hasDetectedVoiceRef.current) {
+              setHasDetectedVoice(true);
+              hasDetectedVoiceRef.current = true;
+            }
+            
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
+          } else if (hasDetectedVoiceRef.current) {
+            if (!silenceTimerRef.current) {
+              silenceTimerRef.current = setTimeout(() => {
+                silenceTimerRef.current = null;
+                stopRecording();
+              }, SILENCE_DURATION);
+            }
+          }
+        }
+      }, 100);
+      
+      console.log('✅ 持續音量監測已啟動');
+    } catch (error) {
+      console.error('啟動持續音量監測失敗:', error);
+    }
+  };
+
+  const stopContinuousVolumeMonitoring = () => {
+    if (continuousVolumeCheckRef.current) {
+      clearInterval(continuousVolumeCheckRef.current);
+      continuousVolumeCheckRef.current = null;
+      console.log('❌ 持續音量監測已停止');
+    }
+  };
+
+  // 簡化的音量檢測循環（保留用於向後兼容）
+  const startVolumeMonitoring = () => {
+    // 現在直接使用持續監測
+    if (!continuousVolumeCheckRef.current) {
+      startContinuousVolumeMonitoring();
+    }
   };
 
   const stopVolumeMonitoring = () => {
+    // 不再停止持續監測，只清理錄音相關的定時器
     if (volumeCheckIntervalRef.current) {
       clearInterval(volumeCheckIntervalRef.current);
       volumeCheckIntervalRef.current = null;
@@ -577,7 +643,7 @@ export default function Home() {
             transition: 'all 0.1s ease'
           }} />
         </div>
-        {(isListening || isCalibrating || conversationStarted) && (
+        {(isListening || isCalibrating || continuousVolumeCheckRef.current) && (
           <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
             靜音閾值: {getSilenceThreshold().toFixed(1)} | 語音閾值: {getVoiceThreshold().toFixed(1)}
             {isSpeaking && (
@@ -593,6 +659,11 @@ export default function Home() {
             {!isSpeaking && !isListening && conversationStarted && !isCalibrating && (
               <span style={{ color: '#007bff', marginLeft: '10px' }}>
                 🔊 等待語音輸入
+              </span>
+            )}
+            {!conversationStarted && !isCalibrating && continuousVolumeCheckRef.current && (
+              <span style={{ color: '#6c757d', marginLeft: '10px' }}>
+                📊 持續音量監測中
               </span>
             )}
             {hasDetectedVoice && (
@@ -830,7 +901,7 @@ export default function Home() {
         <p>🔄 AI 回應後自動重新開始錄音，實現連續對話</p>
         <p>🧠 智慧對話記憶：AI 會記住最近的對話內容，讓交談更自然</p>
         <p>🎭 真人化回應：使用專門的提示詞讓 AI 回答更像真人對話</p>
-        <p>🔇 語音檢測：基本音量檢測功能，錄音時檢測語音活動</p>
+        <p>� 持續音量監測：永遠監測環境音量，即使未開始對話也能看到音量變化</p>
       </div>
 
       <style jsx>{`
