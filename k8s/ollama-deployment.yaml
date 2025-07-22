@@ -38,14 +38,14 @@ spec:
           resources:
             limits:
               nvidia.com/gpu: "1"
-              memory: "8Gi"
+              memory: "16Gi"  # 增加內存限制
               cpu: "2"
             requests:
               nvidia.com/gpu: "1"
-              memory: "4Gi"
+              memory: "8Gi"   # 增加內存請求
               cpu: "1"
       volumes:
         - name: ollama-storage
           emptyDir:
             medium: Memory  # 使用內存作為存儲
-            sizeLimit: 16Gi  # 限制大小，因為 gemma3:12b 模型較大
+            sizeLimit: 12Gi  # 減少到 12Gi，為 pod 內存留出空間
