@@ -54,10 +54,9 @@ cp whisper-deployment.yaml whisper-deployment.yaml.bak
 sed -i "s|gcr.io/$PROJECT_ID/local-voice-ai:latest|$REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest|g" app-deployment.yaml
 sed -i "s|gcr.io/$PROJECT_ID/whisper-service:latest|$REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest|g" whisper-deployment.yaml
 
-# Apply PVC first
-echo "📦 Applying PVC..."
-kubectl apply -f hf-cache-pvc.yaml
-kubectl apply -f ollama-pvc.yaml
+# # Apply PVC first
+# echo "📦 Applying PVC..."
+# kubectl apply -f ollama-pvc.yaml  
 
 # Apply ConfigMap
 echo "⚙️ Applying ConfigMap..."

@@ -69,3 +69,7 @@ Thumbs.db
 
 # GCP deployment
 k8s/gcp_deploy.sh 
+
+# DEV Setting
+docker-compose.dev.yml
+app/tmp/*.webm
