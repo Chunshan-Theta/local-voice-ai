@@ -23,63 +23,8 @@ import {
 // Import from the existing types system
 import { AgentConfig } from "./types";
 import { UserInfoModal, type UserInfo, ChatRoom } from "./components";
-
-// Simple language type definition
-type Language = 'zh' | 'en';
-
-// Helper function to create example agent config
-function createExampleAgentConfig(lang: Language): AgentConfig {
-  const instructions = lang === 'zh' 
-    ? `你是一個友善、專業的 AI 語音助手。請用自然、親切的方式與用戶對話。
-
-## 你的角色
-- 你是一個智能語音助手，能夠理解並回應用戶的各種問題
-- 你擅長進行自然對話，提供有用的信息和建議
-- 你會用中文與用戶交流
-
-## 對話風格
-- 保持友善、耐心的態度
-- 回答要簡潔明了，避免過長的回應
-- 適當使用表情符號讓對話更生動
-- 如果不確定某些信息，請誠實說明
-
-## 注意事項
-- 請用中文回應
-- 保持對話的自然流暢
-- 避免重複或機械性的回答`
-    : `You are a friendly and professional AI voice assistant. Please communicate with users in a natural and warm manner.
-
-## Your Role
-- You are an intelligent voice assistant capable of understanding and responding to various user questions
-- You excel at natural conversation and providing helpful information and suggestions
-- You communicate with users in English
-
-## Conversation Style
-- Maintain a friendly and patient attitude
-- Keep responses concise and clear, avoiding overly long responses
-- Use appropriate emojis to make conversations more lively
-- If uncertain about information, please be honest about it
-
-## Important Notes
-- Please respond in English
-- Keep conversations natural and smooth
-- Avoid repetitive or mechanical responses`;
-
-  return {
-    name: lang === 'zh' ? '智能語音助手' : 'Smart Voice Assistant',
-    publicDescription: lang === 'zh' 
-      ? '一個友善的AI語音助手，能夠進行自然對話並提供有用的信息' 
-      : 'A friendly AI voice assistant capable of natural conversation and providing helpful information',
-    instructions,
-    tools: [],
-    toolLogic: {},
-    lang: lang,
-    voice: 'echo',
-    criteria: lang === 'zh' 
-      ? '評估對話的自然度、有用性和用戶滿意度' 
-      : 'Evaluate conversation naturalness, usefulness, and user satisfaction'
-  };
-}
+import { AgentConfigManager } from "./utils/agentConfigManager";
+import { type Language } from "./utils/agentFactory";
 
 function ClassChatPage() {
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
@@ -141,7 +86,7 @@ function ClassChatPage() {
   const SILENCE_DURATION = 1000; // 2秒靜音後自動發送
   const MIN_RECORDING_DURATION = 1000; // 最小錄音時間：1秒
 
-  // Agent 配置載入 - 直接創建範例配置
+  // Agent 配置載入 - 使用 AgentConfigManager
   useEffect(() => {
     if (!clientLanguage) {
       return;
@@ -151,8 +96,9 @@ function ClassChatPage() {
       setLocalLoading(true);
       setError(null);
 
-      // 直接創建範例 Agent 配置
-      const exampleConfig = createExampleAgentConfig(clientLanguage);
+      // 使用 AgentConfigManager 載入範例配置
+      const agentManager = AgentConfigManager.getInstance();
+      const exampleConfig = agentManager.loadExampleConfig(clientLanguage);
       setAgentConfig(exampleConfig);
       
       console.log('✅ 已載入範例 Agent 配置:', exampleConfig.name);
