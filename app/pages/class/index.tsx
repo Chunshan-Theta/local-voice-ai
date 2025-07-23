@@ -92,6 +92,7 @@ function ClassChatPage() {
   const [clientLanguage, setClientLanguage] = useState<Language>('zh');
   const [userInfo, setUserInfo] = useState<UserInfo>({ email: '', uname: '' });
   const [isUserInfoValid, setIsUserInfoValid] = useState(false);
+  const [showUserInfoModal, setShowUserInfoModal] = useState(true);
 
   // 語音相關狀態
   const [isListening, setIsListening] = useState(false);
@@ -168,11 +169,13 @@ function ClassChatPage() {
     }
   }, [clientLanguage]);
 
-  // 用戶信息驗證
-  useEffect(() => {
-    const isValid = userInfo.email.trim() !== '' && userInfo.uname.trim() !== '';
-    setIsUserInfoValid(isValid);
-  }, [userInfo]);
+  // 處理用戶信息提交
+  const handleUserInfoSubmit = () => {
+    if (userInfo.email.trim() && userInfo.uname.trim()) {
+      setIsUserInfoValid(true);
+      setShowUserInfoModal(false);
+    }
+  };
 
   // 簡化TTS管理器初始化
   useEffect(() => {
@@ -981,7 +984,7 @@ function ClassChatPage() {
       display: 'flex', 
       flexDirection: 'column', 
       height: '100vh', 
-      background: 'linear-gradient(135deg, #2d5a6b 0%, #4a7c7e 100%)',
+      background: '#2F4F4F',
       position: 'relative'
     }}>
       {/* 頂部訊息提示區域 */}
@@ -1032,21 +1035,21 @@ function ClassChatPage() {
       </div>
 
       {/* 用戶信息輸入模態（如果需要） */}
-      {!isUserInfoValid && (
+      {showUserInfoModal && (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 100
         }}>
           <div style={{
-            backgroundColor: '#3A5A6B',
+            backgroundColor: '#2F4F4F',
             padding: '40px',
             borderRadius: '12px',
             maxWidth: '400px',
@@ -1067,11 +1070,16 @@ function ClassChatPage() {
                 type="email"
                 value={userInfo.email}
                 onChange={(e) => setUserInfo(prev => ({ ...prev, email: e.target.value }))}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && userInfo.email.trim() && userInfo.uname.trim()) {
+                    handleUserInfoSubmit();
+                  }
+                }}
                 placeholder="電子郵件"
                 style={{
                   width: '100%',
                   padding: '16px',
-                  backgroundColor: '#4A6B75',
+                  backgroundColor: '#1C3A3A',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '16px',
@@ -1086,11 +1094,16 @@ function ClassChatPage() {
                 type="text"
                 value={userInfo.uname}
                 onChange={(e) => setUserInfo(prev => ({ ...prev, uname: e.target.value }))}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && userInfo.email.trim() && userInfo.uname.trim()) {
+                    handleUserInfoSubmit();
+                  }
+                }}
                 placeholder="姓名"
                 style={{
                   width: '100%',
                   padding: '16px',
-                  backgroundColor: '#4A6B75',
+                  backgroundColor: '#1C3A3A',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '16px',
@@ -1101,11 +1114,7 @@ function ClassChatPage() {
               />
             </div>
             <button
-              onClick={() => {
-                if (userInfo.email.trim() && userInfo.uname.trim()) {
-                  setIsUserInfoValid(true);
-                }
-              }}
+              onClick={handleUserInfoSubmit}
               disabled={!userInfo.email.trim() || !userInfo.uname.trim()}
               style={{
                 width: '100%',
@@ -1186,7 +1195,7 @@ function ClassChatPage() {
             bottom: 0,
             left: 0,
             right: 0,
-            backgroundColor: 'rgba(45, 90, 107, 0.95)',
+            backgroundColor: 'rgba(47, 79, 79, 0.95)',
             padding: '20px',
             display: 'flex',
             flexDirection: 'column',
@@ -1324,7 +1333,7 @@ function ClassChatPage() {
         }
         
         input:focus {
-          background-color: #5A7B85 !important;
+          background-color: #2A4A4A !important;
           box-shadow: 0 0 0 2px rgba(92, 186, 164, 0.3) !important;
         }
       `}</style>
