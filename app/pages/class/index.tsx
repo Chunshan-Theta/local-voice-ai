@@ -22,7 +22,7 @@ import {
 
 // Import from the existing types system
 import { AgentConfig } from "./types";
-import { UserInfoModal, type UserInfo, ChatRoom } from "./components";
+import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar } from "./components";
 import { AgentConfigManager } from "./utils/agentConfigManager";
 import { type Language } from "./utils/agentFactory";
 
@@ -922,52 +922,15 @@ function ClassChatPage() {
       background: '#2F4F4F',
       position: 'relative'
     }}>
-      {/* 頂部訊息提示區域 */}
-      {(!isUserInfoValid || !agentConfig || localLoading || error) && (
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: 'rgba(26, 42, 52, 0.9)',
-          color: 'white',
-          padding: '10px 20px',
-          borderRadius: '20px',
-          fontSize: '14px',
-          zIndex: 10,
-          maxWidth: '90%',
-          textAlign: 'center'
-        }}>
-          {localLoading ? '載入中...' : 
-           error ? error : 
-           !agentConfig ? '系統初始化中...' : 
-           '請先填寫個人資訊以開始使用'}
-        </div>
-      )}
-
-      {/* 語言切換按鈕 - 右上角 */}
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        right: '20px',
-        zIndex: 10
-      }}>
-        <button
-          onClick={() => setClientLanguage(clientLanguage === 'zh' ? 'en' : 'zh')}
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            padding: '8px 12px',
-            fontSize: '14px',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
-        >
-          {clientLanguage.toUpperCase()}
-        </button>
-      </div>
+      {/* 頂部工具列 */}
+      <TopToolbar
+        showNotification={!isUserInfoValid || !agentConfig || localLoading || !!error}
+        localLoading={localLoading}
+        error={error}
+        agentConfig={agentConfig}
+        currentLanguage={clientLanguage}
+        onLanguageChange={setClientLanguage}
+      />
 
       {/* 用戶信息輸入模態（如果需要） */}
       <UserInfoModal 
