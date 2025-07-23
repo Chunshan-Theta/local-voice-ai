@@ -28,18 +28,51 @@ const ChatRoom: React.FC<ChatRoomProps> = ({
       className={className}
       style={{ 
         flex: 1,
-        padding: '80px 20px 120px 20px',
-        overflow: 'auto'
+        padding: '80px 20px 180px 20px',
+        display: 'flex',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #2c5f5f 0%, #1a4040 50%, #0d2626 100%)'
       }}
     >
-      {messages.length === 0 ? (
-        <EmptyState conversationStarted={conversationStarted} />
-      ) : (
-        messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))
-      )}
-      <div ref={messagesEndRef} />
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '480px',
+          height: 'calc(100vh - 200px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          margin: '0 auto',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        {messages.length === 0 ? (
+          <div style={{ 
+            flex: 1, 
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <EmptyState conversationStarted={conversationStarted} />
+          </div>
+        ) : (
+          <div style={{ 
+            flex: 1, 
+            padding: '20px',
+            overflow: 'auto'
+          }}>
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
