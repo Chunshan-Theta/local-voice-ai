@@ -124,7 +124,7 @@ function ClassChatPage() {
         {
           enabled: ttsEnabled,
           voice: null,
-          rate: 1.0,
+          rate: 1.5,
           volume: 0.8,
           pitch: 1.0
         },

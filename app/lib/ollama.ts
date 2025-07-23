@@ -85,7 +85,7 @@ export async function chatWithOllama(
 - 回應要簡潔明瞭，通常 1-2 句話即可
 - 適當使用語氣詞和表達情感
 - 這是語音對話，你的回應會被朗讀出來，所以要聽起來自然流暢
-- 不要使用表情符號或非口語內容
+- 不要使用表情符號或小括弧包含狀態，例如「😊」、「（停頓，語氣無奈）」
 
 ${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
   } else {

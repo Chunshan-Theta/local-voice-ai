@@ -328,7 +328,7 @@ export const TTS_CONFIG = {
   DEFAULT_OPTIONS: {
     enabled: true,
     voice: null,
-    rate: 1.0,
+    rate: 1.25,
     volume: 0.8,
     pitch: 1.0
   } as TtsOptions,
