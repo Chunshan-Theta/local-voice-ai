@@ -22,14 +22,10 @@ import {
 
 // Import from the existing types system
 import { AgentConfig } from "./types";
+import { UserInfoModal, type UserInfo } from "./components";
 
 // Simple language type definition
 type Language = 'zh' | 'en';
-
-interface UserInfo {
-  email: string;
-  uname: string;
-}
 
 // Helper function to create example agent config
 function createExampleAgentConfig(lang: Language): AgentConfig {
@@ -143,7 +139,7 @@ function ClassChatPage() {
   const interruptCheckCountRef = useRef(0);
 
   // 常數
-  const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
+  const SILENCE_DURATION = 1000; // 2秒靜音後自動發送
   const MIN_RECORDING_DURATION = 1000; // 最小錄音時間：1秒
 
   // Agent 配置載入 - 直接創建範例配置
@@ -170,11 +166,10 @@ function ClassChatPage() {
   }, [clientLanguage]);
 
   // 處理用戶信息提交
-  const handleUserInfoSubmit = () => {
-    if (userInfo.email.trim() && userInfo.uname.trim()) {
-      setIsUserInfoValid(true);
-      setShowUserInfoModal(false);
-    }
+  const handleUserInfoSubmit = (userInfo: UserInfo) => {
+    setUserInfo(userInfo);
+    setIsUserInfoValid(true);
+    setShowUserInfoModal(false);
   };
 
   // 簡化TTS管理器初始化
@@ -1035,105 +1030,10 @@ function ClassChatPage() {
       </div>
 
       {/* 用戶信息輸入模態（如果需要） */}
-      {showUserInfoModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100
-        }}>
-          <div style={{
-            backgroundColor: '#2F4F4F',
-            padding: '40px',
-            borderRadius: '12px',
-            maxWidth: '400px',
-            width: '90%',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-          }}>
-            <h3 style={{ 
-              margin: '0 0 30px 0', 
-              textAlign: 'center', 
-              color: 'white',
-              fontSize: '18px',
-              fontWeight: '400'
-            }}>
-              請輸入您的資訊
-            </h3>
-            <div style={{ marginBottom: '20px' }}>
-              <input
-                type="email"
-                value={userInfo.email}
-                onChange={(e) => setUserInfo(prev => ({ ...prev, email: e.target.value }))}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && userInfo.email.trim() && userInfo.uname.trim()) {
-                    handleUserInfoSubmit();
-                  }
-                }}
-                placeholder="電子郵件"
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  backgroundColor: '#1C3A3A',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  color: 'white',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: '30px' }}>
-              <input
-                type="text"
-                value={userInfo.uname}
-                onChange={(e) => setUserInfo(prev => ({ ...prev, uname: e.target.value }))}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && userInfo.email.trim() && userInfo.uname.trim()) {
-                    handleUserInfoSubmit();
-                  }
-                }}
-                placeholder="姓名"
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  backgroundColor: '#1C3A3A',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  color: 'white',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <button
-              onClick={handleUserInfoSubmit}
-              disabled={!userInfo.email.trim() || !userInfo.uname.trim()}
-              style={{
-                width: '100%',
-                padding: '16px',
-                backgroundColor: userInfo.email.trim() && userInfo.uname.trim() ? '#5CBAA4' : '#6B8E9A',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                color: 'white',
-                cursor: userInfo.email.trim() && userInfo.uname.trim() ? 'pointer' : 'not-allowed',
-                fontWeight: '500',
-                transition: 'background-color 0.2s ease'
-              }}
-            >
-              開始
-            </button>
-          </div>
-        </div>
-      )}
+      <UserInfoModal 
+        isVisible={showUserInfoModal}
+        onSubmit={handleUserInfoSubmit}
+      />
 
       {/* 主要聊天區域 */}
       {isUserInfoValid && agentConfig && !localLoading && (
@@ -1326,15 +1226,6 @@ function ClassChatPage() {
           0% { transform: scale(1); }
           50% { transform: scale(1.05); }
           100% { transform: scale(1); }
-        }
-        
-        input::placeholder {
-          color: rgba(255, 255, 255, 0.6) !important;
-        }
-        
-        input:focus {
-          background-color: #2A4A4A !important;
-          box-shadow: 0 0 0 2px rgba(92, 186, 164, 0.3) !important;
         }
       `}</style>
     </div>
