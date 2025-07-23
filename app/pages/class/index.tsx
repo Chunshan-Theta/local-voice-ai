@@ -1,8 +1,6 @@
 'use client';
 
-import React, { Suspense, useState, useEffect, useRef, useMemo, ChangeEvent } from "react";
-import axios from 'axios';
-import type { ConversationMessage } from '../../lib/ollama';
+import React, { useState, useEffect, useRef } from "react";
 import { 
   createNoiseCalibrator, 
   createThresholdCalculator, 
@@ -12,8 +10,7 @@ import {
 } from '../../lib/noiseCalibrator';
 import { 
   createTtsManager, 
-  type TtsManager, 
-  TTS_CONFIG 
+  type TtsManager
 } from '../../lib/ttsManager';
 import { 
   createReplyManager, 
@@ -24,7 +21,7 @@ import {
 } from '../../lib/replyManager';
 
 // Import from the existing types system
-import { AgentConfig, Tool, TranscriptItem } from "./types";
+import { AgentConfig } from "./types";
 
 // Simple language type definition
 type Language = 'zh' | 'en';
@@ -89,10 +86,8 @@ function createExampleAgentConfig(lang: Language): AgentConfig {
 }
 
 function ClassChatPage() {
-  const [chatBackground] = useState("#173944");
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pageBackground] = useState("linear-gradient(135deg, rgb(26, 42, 52) 0%, rgb(46, 74, 63) 100%)");
   const [localLoading, setLocalLoading] = useState(false);
   const [clientLanguage, setClientLanguage] = useState<Language>('zh');
   const [userInfo, setUserInfo] = useState<UserInfo>({ email: '', uname: '' });
@@ -122,12 +117,11 @@ function ClassChatPage() {
   const [showReportButton, setShowReportButton] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   
-  // 簡化的refs管理
+  // refs管理
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const volumeCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const continuousVolumeCheckRef = useRef<NodeJS.Timeout | null>(null); // 新增：持續音量監測
+  const continuousVolumeCheckRef = useRef<NodeJS.Timeout | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -136,18 +130,16 @@ function ClassChatPage() {
   const ttsManagerRef = useRef<TtsManager | null>(null);
   const replyManagerRef = useRef<ReplyManager | null>(null);
 
-  // 簡化的refs
   const isListeningRef = useRef(false);
   const hasDetectedVoiceRef = useRef(false);
   const waitingForVoiceAfterTtsRef = useRef(false);
   const conversationStartedRef = useRef(false);
   const baselineNoiseRef = useRef(10);
-  const recordingStartTimeRef = useRef<number>(0); // 記錄開始錄音的時間
+  const recordingStartTimeRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // 打斷相關 refs
   const isInterruptingRef = useRef(false);
-  const interruptCheckCountRef = useRef(0); // 用於連續檢測計數
+  const interruptCheckCountRef = useRef(0);
 
   // 常數
   const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
@@ -926,9 +918,9 @@ function ClassChatPage() {
 
   const stopVolumeMonitoring = () => {
     // 不再停止持續監測，只清理錄音相關的定時器
-    if (volumeCheckIntervalRef.current) {
-      clearInterval(volumeCheckIntervalRef.current);
-      volumeCheckIntervalRef.current = null;
+    if (continuousVolumeCheckRef.current) {
+      clearInterval(continuousVolumeCheckRef.current);
+      continuousVolumeCheckRef.current = null;
     }
   };
 
