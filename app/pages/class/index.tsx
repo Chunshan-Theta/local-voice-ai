@@ -989,547 +989,298 @@ function ClassChatPage() {
       display: 'flex', 
       flexDirection: 'column', 
       height: '100vh', 
-      maxWidth: '800px', 
-      margin: '0 auto',
-      padding: '1rem'
+      background: 'linear-gradient(135deg, #2d5a6b 0%, #4a7c7e 100%)',
+      position: 'relative'
     }}>
-      {/* Header with Agent info and Language selector */}
-      <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
-              {agentConfig?.name || '本地語音 AI 助手'} 🧠 
-              <span style={{ fontSize: '0.8rem', color: '#666', marginLeft: '0.5rem' }}>(範例配置)</span>
-            </h1>
-            {agentConfig?.publicDescription && (
-              <p style={{ margin: '0.5rem 0 0 0', color: '#666', fontSize: '0.9rem' }}>
-                {agentConfig.publicDescription}
-              </p>
-            )}
-            <p style={{ margin: '0.5rem 0 0 0', color: '#999', fontSize: '0.8rem', fontStyle: 'italic' }}>
-              💡 這是一個範例 AI 助手配置，您可以直接開始語音對話體驗
-            </p>
-          </div>
-          
-          {/* Language Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.9rem', color: '#666' }}>語言:</label>
-            <select
-              value={clientLanguage}
-              onChange={(e) => setClientLanguage(e.target.value as Language)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid #ccc',
-                fontSize: '0.9rem'
-              }}
-            >
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-        </div>
-
-        {/* User Info Collection */}
-        {!isUserInfoValid && (
-          <div style={{ padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '8px', marginBottom: '1rem' }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', color: '#856404' }}>
-              請填寫用戶信息以開始對話
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#856404' }}>
-                  Email:
-                </label>
-                <input
-                  type="email"
-                  value={userInfo.email}
-                  onChange={(e) => setUserInfo(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="請輸入您的 Email"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#856404' }}>
-                  用戶名:
-                </label>
-                <input
-                  type="text"
-                  value={userInfo.uname}
-                  onChange={(e) => setUserInfo(prev => ({ ...prev, uname: e.target.value }))}
-                  placeholder="請輸入您的用戶名"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem'
-                  }}
-                />
-              </div>
-            </div>
-            <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#856404', backgroundColor: 'rgba(255,255,255,0.5)', padding: '0.5rem', borderRadius: '4px' }}>
-              💡 <strong>使用提示：</strong> 填寫信息後，點擊「校準並開始對話」，系統會自動校準環境音。
-              校準完成後即可開始語音對話。對話過程中，AI 會在回應後自動等待您的語音輸入。
-            </div>
-          </div>
-        )}
-
-        {/* Loading state */}
-        {localLoading && (
-          <div style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
-            <div>📡 載入 Agent 配置中...</div>
-          </div>
-        )}
-
-        {/* Error state */}
-        {error && !agentConfig && (
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: '#f8d7da', 
-            color: '#721c24', 
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            ❌ {error}
-          </div>
-        )}
-      </div>
-
-      {/* Main content - only show if user info is valid and agent is loaded */}
-      {isUserInfoValid && agentConfig && !localLoading && (
-        <>
-          <p style={{ color: '#666', marginBottom: '1rem' }}>
-            🎯 <strong>範例語音 AI 助手</strong> - 智慧對話記憶 + 真人化回應。自動校準環境音，智慧檢測語音活動。AI 會記住對話內容，回應後自動重新開始錄音。
-            <br />
-            <span style={{ fontSize: '0.9rem', color: '#888', fontStyle: 'italic' }}>
-              無需設定，直接體驗完整的語音 AI 對話功能！
-            </span>
-          </p>
-      
-      {/* 音量監控 */}
-      <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '0.9rem', color: '#666' }}>音量監控</span>
-          <span style={{ fontSize: '0.8rem', color: '#666' }}>
-            當前: {currentVolume.toFixed(1)}
-          </span>
-        </div>
-        <div style={{ 
-          width: '100%', 
-          height: '8px', 
-          backgroundColor: '#e9ecef', 
-          borderRadius: '4px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            width: `${getVolumePercentage()}%`,
-            height: '100%',
-            backgroundColor: getVolumeBarColor(),
-            transition: 'all 0.1s ease'
-          }} />
-        </div>
-        {(isListening || isCalibrating || continuousVolumeCheckRef.current) && (
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
-            靜音閾值: {getSilenceThreshold().toFixed(1)} | 語音閾值: {getVoiceThreshold().toFixed(1)}
-            {ttsManagerRef.current && ttsManagerRef.current.isSpeaking() && (
-              <span style={{ color: '#ff5722', marginLeft: '10px' }}>
-                | 搶話閾值: {getInterruptThreshold().toFixed(1)}
-              </span>
-            )}
-            {isInterrupting && (
-              <span style={{ color: '#e91e63', marginLeft: '10px' }}>
-                🚨 正在打斷TTS
-              </span>
-            )}
-            {isSpeaking && !isInterrupting && (
-              <span style={{ color: '#9c27b0', marginLeft: '10px' }}>
-                🗣️ TTS播放中
-              </span>
-            )}
-            {!isSpeaking && isListening && (
-              <span style={{ color: '#28a745', marginLeft: '10px' }}>
-                🎤 錄音模式
-              </span>
-            )}
-            {!isSpeaking && !isListening && conversationStarted && !isCalibrating && (
-              <span style={{ color: '#007bff', marginLeft: '10px' }}>
-                {waitingForVoiceAfterTts ? '🔄 等待語音觸發錄音' : '🔊 等待語音輸入'}
-              </span>
-            )}
-            {!conversationStarted && !isCalibrating && continuousVolumeCheckRef.current && (
-              <span style={{ color: '#6c757d', marginLeft: '10px' }}>
-                📊 持續音量監測中
-              </span>
-            )}
-            {hasDetectedVoice && (
-              <span style={{ color: '#28a745', marginLeft: '10px' }}>✅ 語音已檢測</span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 控制按鈕 */}
-      <div style={{ marginBottom: '1rem' }}>
-        {isCalibrating ? (
-          <div style={{ textAlign: 'center' }}>
-            <button
-              disabled
-              style={{
-                padding: '1rem 2rem',
-                fontSize: '1.2rem',
-                backgroundColor: '#ffc107',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'not-allowed',
-              }}
-            >
-              🔧 校準環境音中... {Math.round(calibrationProgress)}%
-            </button>
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '0.5rem', 
-              backgroundColor: '#fff3cd', 
-              borderRadius: '4px',
-              fontSize: '0.9rem',
-              color: '#856404'
-            }}>
-              請保持安靜 {Math.ceil((NOISE_CALIBRATION_CONFIG.DEFAULT_CALIBRATION_DURATION - (calibrationProgress / 100 * NOISE_CALIBRATION_CONFIG.DEFAULT_CALIBRATION_DURATION)) / 1000)} 秒，讓系統學習環境音...
-            </div>
-          </div>
-        ) : !conversationStarted ? (
-          <div style={{ textAlign: 'center' }}>
-            <button
-              onClick={startConversation}
-              disabled={loading}
-              style={{
-                padding: '1rem 2rem',
-                fontSize: '1.2rem',
-                backgroundColor: loading ? '#6c757d' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                marginRight: '1rem'
-              }}
-            >
-              🎙️ 校準並開始對話
-            </button>
-            
-            {/* 開始新對話按鈕（當有報告可生成時） */}
-            {showReportButton && (
-              <button
-                onClick={startNewConversation}
-                style={{
-                  padding: '1rem 2rem',
-                  fontSize: '1.2rem',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                🆕 開始新對話
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            
-            {/* 手動開始錄音按鈕 */}
-            {!isListening && !loading && !waitingForVoiceAfterTts && (
-              <button
-                onClick={startListening}
-                style={{
-                  padding: '1rem 1.5rem',
-                  fontSize: '1rem',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                🎤 開始錄音
-              </button>
-            )}
-            
-            <button
-              onClick={endConversation}
-              style={{
-                padding: '1rem 1.5rem',
-                fontSize: '1rem',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                marginRight: '1rem'
-              }}
-            >
-              🛑 結束對話
-            </button>
-
-            {/* 生成報告按鈕 */}
-            {messages.length > 0 && (
-              <button
-                onClick={generateReport}
-                disabled={generatingReport}
-                style={{
-                  padding: '1rem 1.5rem',
-                  fontSize: '1rem',
-                  backgroundColor: generatingReport ? '#6c757d' : '#17a2b8',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: generatingReport ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {generatingReport ? '⏳ 生成中...' : '📊 生成報告'}
-              </button>
-            )}
-
-          </div>
-        )}
-        
-        {/* 報告生成區域 */}
-        {showReportButton && (
-          <div style={{ 
-            marginTop: '1rem', 
-            padding: '1rem', 
-            backgroundColor: '#d1ecf1', 
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#0c5460' }}>對話已結束</h3>
-            <p style={{ margin: '0 0 1rem 0', color: '#0c5460', fontSize: '0.9rem' }}>
-              您可以生成此次對話的報告，或開始新的對話。
-            </p>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <button
-                onClick={generateReport}
-                disabled={generatingReport}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  fontSize: '1rem',
-                  backgroundColor: generatingReport ? '#6c757d' : '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: generatingReport ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {generatingReport ? '⏳ 生成報告中...' : '📊 生成對話報告'}
-              </button>
-              <button
-                onClick={startNewConversation}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  fontSize: '1rem',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                🆕 開始新對話
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {isListening && (
-          <div style={{ 
-            marginTop: '1rem', 
-            padding: '0.5rem', 
-            backgroundColor: hasDetectedVoice ? '#d4edda' : '#fff3cd', 
-            borderRadius: '4px',
-            fontSize: '0.9rem',
-            color: hasDetectedVoice ? '#155724' : '#856404'
-          }}>
-            {hasDetectedVoice 
-              ? `🟢 已檢測到語音，停止說話 ${SILENCE_DURATION/1000} 秒後會自動發送...` 
-              : `🎤 錄音模式 - 等待語音輸入...（當前音量: ${currentVolume.toFixed(1)}, 需要超過: ${getVoiceThreshold().toFixed(1)}）`
-            }
-          </div>
-        )}
-
-        {conversationStarted && !isListening && !loading && (
-          <div style={{ 
-            marginTop: '1rem', 
-            padding: '0.5rem', 
-            backgroundColor: waitingForVoiceAfterTts ? '#fff3cd' : '#d1ecf1', 
-            borderRadius: '4px',
-            fontSize: '0.9rem',
-            color: waitingForVoiceAfterTts ? '#856404' : '#0c5460'
-          }}>
-            {waitingForVoiceAfterTts ? (
-              <>🔄 等待語音觸發錄音... （當前音量: {currentVolume.toFixed(1)}, 需要超過: {getVoiceThreshold().toFixed(1)}）</>
-            ) : (
-              <>🔄 等待語音輸入或TTS播放...</>
-            )}
-            {isSpeaking && (
-              <span style={{ marginLeft: '10px', color: '#28a745' }}>
-                🗣️ TTS播放中
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {error && (
+      {/* 頂部訊息提示區域 */}
+      {(!isUserInfoValid || !agentConfig || localLoading || error) && (
         <div style={{
-          padding: '1rem',
-          backgroundColor: (error.includes('未識別到有效語音') || error.includes('錄音時間過短')) ? '#fff3cd' : '#f8d7da',
-          color: (error.includes('未識別到有效語音') || error.includes('錄音時間過短')) ? '#856404' : '#721c24',
-          borderRadius: '4px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
+          position: 'absolute',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(26, 42, 52, 0.9)',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '20px',
+          fontSize: '14px',
+          zIndex: 10,
+          maxWidth: '90%',
+          textAlign: 'center'
         }}>
-          {error.includes('未識別到有效語音') ? (
-            <>
-              🎤 {error}，請重新說話...
-              <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: 'auto' }}>
-                (2秒後自動恢復)
-              </span>
-            </>
-          ) : error.includes('錄音時間過短') ? (
-            <>
-              ⏱️ {error}
-              <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: 'auto' }}>
-                (2秒後自動恢復)
-              </span>
-            </>
-          ) : (
-            <>錯誤：{error}</>
-          )}
+          {localLoading ? '載入中...' : 
+           error ? error : 
+           !agentConfig ? '系統初始化中...' : 
+           '請先填寫個人資訊以開始使用'}
         </div>
       )}
 
-      {/* 聊天記錄區域 */}
-      <div style={{ 
-        flex: 1, 
-        backgroundColor: '#f8f9fa', 
-        borderRadius: '8px', 
-        padding: '1rem', 
-        overflow: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem'
+      {/* 語言切換按鈕 - 右上角 */}
+      <div style={{
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        zIndex: 10
       }}>
-        {messages.length === 0 && conversationStarted && (
-          <div style={{ 
-            textAlign: 'center', 
-            color: '#666', 
-            fontStyle: 'italic',
-            marginTop: '2rem'
-          }}>
-            🎤 開始說話來進行對話...
-          </div>
-        )}
+        <button
+          onClick={() => setClientLanguage(clientLanguage === 'zh' ? 'en' : 'zh')}
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '8px 12px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          {clientLanguage.toUpperCase()}
+        </button>
+      </div>
 
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            style={{
-              display: 'flex',
-              justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
-              marginBottom: '1rem'
-            }}
-          >
-                          <div
+      {/* 用戶信息輸入模態（如果需要） */}
+      {!isUserInfoValid && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '15px',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3 style={{ margin: '0 0 20px 0', textAlign: 'center', color: '#333' }}>
+              請填寫個人資訊
+            </h3>
+            <div style={{ marginBottom: '15px' }}>
+              <input
+                type="email"
+                value={userInfo.email}
+                onChange={(e) => setUserInfo(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="請輸入您的 Email"
                 style={{
-                  maxWidth: '70%',
-                  padding: '1rem',
-                  borderRadius: '12px',
-                  backgroundColor: message.type === 'user' ? '#007bff' : '#e9ecef',
-                  color: message.type === 'user' ? 'white' : '#333',
-                  position: 'relative',
-                  opacity: message.isLoading ? 0.7 : 1,
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <input
+                type="text"
+                value={userInfo.uname}
+                onChange={(e) => setUserInfo(prev => ({ ...prev, uname: e.target.value }))}
+                placeholder="請輸入您的用戶名"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 主要聊天區域 */}
+      {isUserInfoValid && agentConfig && !localLoading && (
+        <>
+          {/* 聊天記錄區域 */}
+          <div style={{ 
+            flex: 1,
+            padding: '80px 20px 120px 20px',
+            overflow: 'auto'
+          }}>
+            {messages.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                color: 'rgba(255, 255, 255, 0.7)', 
+                marginTop: '40vh',
+                fontSize: '16px'
+              }}>
+                {conversationStarted ? '🎤 開始說話來進行對話...' : '點擊開始按鈕來開始對話'}
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: '15px'
+                  }}
+                >
+                  <div
+                    style={{
+                      maxWidth: '80%',
+                      padding: '12px 16px',
+                      borderRadius: '18px',
+                      backgroundColor: message.type === 'user' 
+                        ? 'rgba(255, 255, 255, 0.9)' 
+                        : 'rgba(255, 255, 255, 0.1)',
+                      color: message.type === 'user' ? '#333' : 'white',
+                      fontSize: '16px',
+                      lineHeight: '1.4',
+                      opacity: message.isLoading ? 0.7 : 1,
+                      border: message.type === 'ai' ? '1px solid rgba(255, 255, 255, 0.2)' : 'none'
+                    }}
+                  >
+                    {message.content}
+                    {message.isLoading && (
+                      <span style={{ marginLeft: '8px' }}>⏳</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* 底部控制區域 */}
+          <div style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(45, 90, 107, 0.95)',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '15px'
+          }}>
+            {/* 輸入區域和控制按鈕 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              justifyContent: 'center'
+            }}>
+              {/* 輸入框（顯示狀態） */}
+              <div style={{
+                flex: 1,
+                maxWidth: '300px',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                padding: '12px 16px',
+                borderRadius: '25px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                fontSize: '14px',
+                textAlign: 'center'
+              }}>
+                {isCalibrating ? `校準中... ${Math.round(calibrationProgress)}%` :
+                 isListening ? '🎤 錄音中...' :
+                 isSpeaking ? '🗣️ AI 回應中...' :
+                 waitingForVoiceAfterTts ? '等待您的語音...' :
+                 conversationStarted ? '等待語音輸入' : '請點擊開始對話'}
+              </div>
+
+              {/* 錄音按鈕（綠色方塊） */}
+              {conversationStarted && (
+                <button
+                  onClick={!isListening ? startListening : stopRecording}
+                  disabled={isCalibrating || loading}
+                  style={{
+                    width: '50px',
+                    height: '50px',
+                    backgroundColor: isListening ? '#ff4444' : '#4CAF50',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: isCalibrating || loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px'
+                  }}
+                >
+                  {isListening ? '⏹️' : '🎤'}
+                </button>
+              )}
+
+              {/* 開始對話按鈕（藍色三角形） */}
+              {!conversationStarted && (
+                <button
+                  onClick={startConversation}
+                  disabled={loading || isCalibrating}
+                  style={{
+                    width: '50px',
+                    height: '50px',
+                    backgroundColor: '#2196F3',
+                    border: 'none',
+                    borderRadius: '50%',
+                    cursor: loading || isCalibrating ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                    color: 'white'
+                  }}
+                >
+                  ▶️
+                </button>
+              )}
+            </div>
+
+            {/* 結束並開始分析按鈕 */}
+            {conversationStarted && messages.length > 0 && (
+              <button
+                onClick={() => {
+                  endConversation();
+                  setTimeout(generateReport, 500);
+                }}
+                disabled={generatingReport}
+                style={{
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  padding: '12px 30px',
+                  fontSize: '16px',
+                  cursor: generatingReport ? 'not-allowed' : 'pointer',
+                  alignSelf: 'center',
+                  fontWeight: 'bold'
                 }}
               >
-                <div style={{ 
-                  fontSize: '0.8rem', 
-                  opacity: 0.8, 
-                  marginBottom: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <span>{message.type === 'user' ? '🗣️ 你' : '🤖 AI'}</span>
-                  <span>{formatTime(message.timestamp)}</span>
-                  {message.isLoading && <span>⏳</span>}
-                  {message.isPlaying && <span>🔊</span>}
-                  
-                  {/* AI消息的播放按鈕 */}
-                  {message.type === 'ai' && !message.isLoading && message.content.trim() && (
-                    <button
-                      onClick={() => {
-                        if (message.isPlaying) {
-                          stopSpeaking();
-                        } else {
-                          speakText(message.content, message.id);
-                        }
-                      }}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        fontSize: '0.7rem',
-                        backgroundColor: message.isPlaying ? '#dc3545' : '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        opacity: 0.8,
-                      }}
-                    >
-                      {message.isPlaying ? '🔇' : '🔊'}
-                    </button>
-                  )}
-                </div>
-                <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>
-                  {message.content}
-                </div>
-              </div>
+                {generatingReport ? '⏳ 分析中...' : '結束並開始分析'}
+              </button>
+            )}
+
+            {/* 重新開始按鈕（當對話結束時） */}
+            {!conversationStarted && showReportButton && (
+              <button
+                onClick={startNewConversation}
+                style={{
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  padding: '12px 30px',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  alignSelf: 'center',
+                  fontWeight: 'bold'
+                }}
+              >
+                � 開始新對話
+              </button>
+            )}
           </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
-        <h4 style={{ margin: '1rem 0 0.5rem 0', color: '#333' }}>✨ 智能語音助手功能特色</h4>
-        <p>✅ 智慧環境音校準，可靠的音量檢測</p>
-        <p>✅ 使用 Whisper Small 模型進行中文語音辨識</p>
-        <p>✅ 連接到 Gemma3:1b 模型生成回覆</p>
-        <p>🗣️ 使用瀏覽器原生 Web Speech API 進行語音合成</p>
-        <p>🔄 AI 回應後等待語音觸發，檢測到超過閾值的音量時自動開始錄音</p>
-        <p>🧠 智慧對話記憶：AI 會記住最近的對話內容，讓交談更自然</p>
-        <p>🎭 真人化回應：使用專門的提示詞讓 AI 回答更像真人對話</p>
-        <p>📊 持續音量監測：永遠監測環境音量，即使未開始對話也能看到音量變化</p>
-        <p>🚨 智慧打斷功能：TTS 播放時若檢測到搶話閾值，會自動停止播放並開始錄音</p>
-        {agentConfig?.tools && agentConfig.tools.length > 0 && (
-          <p>🛠️ 工具整合：支援 {agentConfig.tools.length} 個專用工具以增強對話能力</p>
-        )}
-        <p>📋 對話報告：結束對話後可生成詳細的對話分析報告</p>
-      </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-          100% { transform: scale(1); }
-        }
-      `}</style>
         </>
       )}
     </div>
