@@ -221,6 +221,7 @@ function ClassChatPage() {
         {
           maxHistoryLength: 10,
           timeout: 60000,
+          agentConfig: agentConfig || undefined,
         },
         {
           onTranscriptionStart: (messageId) => {
@@ -308,6 +309,14 @@ function ClassChatPage() {
       }
     };
   }, [ttsEnabled]);
+
+  // 當 agentConfig 變化時更新 replyManager
+  useEffect(() => {
+    if (replyManagerRef.current && agentConfig) {
+      replyManagerRef.current.updateAgentConfig(agentConfig);
+      console.log('✅ 已更新 ReplyManager 的 Agent 配置:', agentConfig.name);
+    }
+  }, [agentConfig]);
 
   // 初始化並啟動持續音量監測
   useEffect(() => {
@@ -863,6 +872,7 @@ function ClassChatPage() {
           <ChatRoom 
             messages={messages}
             conversationStarted={conversationStarted}
+            agentConfig={agentConfig}
           />
 
           {/* 底部控制面板 */}

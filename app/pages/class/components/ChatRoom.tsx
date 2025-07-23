@@ -4,16 +4,19 @@ import React, { useRef, useEffect } from 'react';
 import { Message } from '../../../lib/replyManager';
 import MessageBubble from './MessageBubble';
 import EmptyState from './EmptyState';
+import { AgentConfig } from '../types/basic';
 
 interface ChatRoomProps {
   messages: Message[];
   conversationStarted: boolean;
+  agentConfig?: AgentConfig | null;
   className?: string;
 }
 
 const ChatRoom: React.FC<ChatRoomProps> = ({ 
   messages, 
   conversationStarted,
+  agentConfig,
   className 
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -38,7 +41,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({
         style={{
           width: '100%',
           maxWidth: '480px',
-          height: 'calc(100vh - 200px)',
+          height: '100%',
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
           backdropFilter: 'blur(10px)',
           borderRadius: '20px',

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
+import type { AgentConfig } from '../pages/class/types/basic';
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -65,13 +66,31 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
 
 export async function chatWithOllama(
   userMessage: string, 
-  conversationHistory: ConversationMessage[] = []
+  conversationHistory: ConversationMessage[] = [],
+  agentConfig?: AgentConfig
 ): Promise<string> {
   console.log('Sending message to Ollama:', userMessage);
   console.log('Conversation history length:', conversationHistory.length);
+  console.log('Using agent config:', agentConfig?.name || 'Default system prompt');
   
-  // 系統提示詞 - 讓 AI 表現得像真人
-  const systemPrompt = `你是一個友善、自然的語音對話夥伴。請用遵守以下方式回應：
+  // 系統提示詞 - 根據 agent 配置或使用預設
+  let systemPrompt: string;
+  
+  if (agentConfig) {
+    // 使用 agent 配置中的指示
+    systemPrompt = `${agentConfig.instructions}
+
+額外指示：
+- 使用自然、口語化的表達方式，就像真人對話一樣
+- 回應要簡潔明瞭，通常 1-2 句話即可
+- 適當使用語氣詞和表達情感
+- 這是語音對話，你的回應會被朗讀出來，所以要聽起來自然流暢
+- 不要使用表情符號或非口語內容
+
+${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
+  } else {
+    // 預設系統提示詞
+    systemPrompt = `你是一個友善、自然的語音對話夥伴。請用遵守以下方式回應：
 
 1. 使用自然、口語化的表達方式，就像真人對話一樣
 2. 回應要簡潔明瞭，通常 1-2 句話即可
@@ -84,6 +103,7 @@ export async function chatWithOllama(
 9. 不要有表情符號等非口語對話內容，例如不要使用「😊」這樣的表情符號
 
 請記住，這是語音對話，你的回應會被朗讀出來，所以要聽起來自然流暢。`;
+  }
 
   try {
     // 構建完整的對話上下文

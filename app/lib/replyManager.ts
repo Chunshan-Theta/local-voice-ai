@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { ConversationMessage } from './ollama';
+import type { AgentConfig } from '../pages/class/types/basic';
 
 export interface Message {
   id: string;
@@ -13,6 +14,7 @@ export interface Message {
 export interface ReplyManagerConfig {
   maxHistoryLength?: number;
   timeout?: number;
+  agentConfig?: AgentConfig;
 }
 
 export interface ReplyManagerCallbacks {
@@ -27,9 +29,10 @@ export interface ReplyManagerCallbacks {
 export interface ReplyManager {
   processAudio: (audioBlob: Blob, conversationHistory: Message[]) => Promise<{ userMessageId: string; aiMessageId: string }>;
   destroy: () => void;
+  updateAgentConfig: (agentConfig: AgentConfig) => void;
 }
 
-const DEFAULT_CONFIG: Required<ReplyManagerConfig> = {
+const DEFAULT_CONFIG: Omit<Required<ReplyManagerConfig>, 'agentConfig'> = {
   maxHistoryLength: 10,
   timeout: 60000,
 };
@@ -39,6 +42,7 @@ export const createReplyManager = (
   callbacks: ReplyManagerCallbacks = {}
 ): ReplyManager => {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  let currentAgentConfig = config.agentConfig;
   
   const processAudio = async (
     audioBlob: Blob, 
@@ -97,6 +101,7 @@ export const createReplyManager = (
       const replyResponse = await axios.post('/api/reply', {
         message: transcript,
         conversationHistory: validHistory,
+        agentConfig: currentAgentConfig,
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -126,9 +131,15 @@ export const createReplyManager = (
     console.log('ReplyManager destroyed');
   };
 
+  const updateAgentConfig = (agentConfig: AgentConfig) => {
+    currentAgentConfig = agentConfig;
+    console.log('ReplyManager agent config updated:', agentConfig.name);
+  };
+
   return {
     processAudio,
     destroy,
+    updateAgentConfig,
   };
 };
 
