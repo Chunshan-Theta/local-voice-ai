@@ -22,7 +22,7 @@ import {
 
 // Import from the existing types system
 import { AgentConfig } from "./types";
-import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar } from "./components";
+import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar, BottomControlPanel } from "./components";
 import { AgentConfigManager } from "./utils/agentConfigManager";
 import { type Language } from "./utils/agentFactory";
 
@@ -865,133 +865,25 @@ function ClassChatPage() {
             conversationStarted={conversationStarted}
           />
 
-          <div style={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: 'rgba(47, 79, 79, 0.95)',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '15px'
-          }}>
-            {/* 輸入區域和控制按鈕 */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              justifyContent: 'center'
-            }}>
-              {/* 輸入框（顯示狀態） */}
-              <div style={{
-                flex: 1,
-                maxWidth: '300px',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                padding: '12px 16px',
-                borderRadius: '25px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                fontSize: '14px',
-                textAlign: 'center'
-              }}>
-                {isCalibrating ? `校準中... ${Math.round(calibrationProgress)}%` :
-                 isListening ? '🎤 錄音中...' :
-                 isSpeaking ? '🗣️ AI 回應中...' :
-                 waitingForVoiceAfterTts ? '等待您的語音...' :
-                 conversationStarted ? '等待語音輸入' : '請點擊開始對話'}
-              </div>
-
-              {/* 錄音按鈕（綠色方塊） */}
-              {conversationStarted && (
-                <button
-                  onClick={!isListening ? startListening : stopRecording}
-                  disabled={isCalibrating || loading}
-                  style={{
-                    width: '50px',
-                    height: '50px',
-                    backgroundColor: isListening ? '#ff4444' : '#4CAF50',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: isCalibrating || loading ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '20px'
-                  }}
-                >
-                  {isListening ? '⏹️' : '🎤'}
-                </button>
-              )}
-
-              {/* 開始對話按鈕（藍色三角形） */}
-              {!conversationStarted && (
-                <button
-                  onClick={startConversation}
-                  disabled={loading || isCalibrating}
-                  style={{
-                    width: '50px',
-                    height: '50px',
-                    backgroundColor: '#2196F3',
-                    border: 'none',
-                    borderRadius: '50%',
-                    cursor: loading || isCalibrating ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '20px',
-                    color: 'white'
-                  }}
-                >
-                  ▶️
-                </button>
-              )}
-            </div>
-
-            {/* 結束並開始分析按鈕 */}
-            {conversationStarted && messages.length > 0 && (
-              <button
-                onClick={() => {
-                  endConversation();
-                  setTimeout(generateReport, 500);
-                }}
-                disabled={generatingReport}
-                style={{
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '25px',
-                  padding: '12px 30px',
-                  fontSize: '16px',
-                  cursor: generatingReport ? 'not-allowed' : 'pointer',
-                  alignSelf: 'center',
-                  fontWeight: 'bold'
-                }}
-              >
-                {generatingReport ? '⏳ 分析中...' : '結束並開始分析'}
-              </button>
-            )}
-
-            {/* 重新開始按鈕（當對話結束時） */}
-            {!conversationStarted && showReportButton && (
-              <button
-                onClick={startNewConversation}
-                style={{
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '25px',
-                  padding: '12px 30px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  alignSelf: 'center',
-                  fontWeight: 'bold'
-                }}
-              >
-                � 開始新對話
-              </button>
-            )}
-          </div>
+          {/* 底部控制面板 */}
+          <BottomControlPanel
+            isCalibrating={isCalibrating}
+            calibrationProgress={calibrationProgress}
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            waitingForVoiceAfterTts={waitingForVoiceAfterTts}
+            conversationStarted={conversationStarted}
+            loading={loading}
+            generatingReport={generatingReport}
+            showReportButton={showReportButton}
+            messagesLength={messages.length}
+            onStartListening={startListening}
+            onStopRecording={stopRecording}
+            onStartConversation={startConversation}
+            onEndConversation={endConversation}
+            onGenerateReport={generateReport}
+            onStartNewConversation={startNewConversation}
+          />
         </>
       )}
       

@@ -11,6 +11,9 @@ export { default as TopToolbar } from './TopToolbar';
 export { default as TopNotificationBar } from './TopNotificationBar';
 export { default as LanguageSwitcher } from './LanguageSwitcher';
 
+// 底部控制面板組件
+export { default as BottomControlPanel } from './BottomControlPanel';
+
 // 語音控制組件
 export { default as VoiceControlPanel } from './VoiceControlPanel';
 
