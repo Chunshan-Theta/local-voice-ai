@@ -28,6 +28,7 @@ export interface ReplyManagerCallbacks {
 
 export interface ReplyManager {
   processAudio: (audioBlob: Blob, conversationHistory: Message[]) => Promise<{ userMessageId: string; aiMessageId: string }>;
+  processTextMessage: (text: string, conversationHistory: Message[]) => Promise<{ userMessageId: string; aiMessageId: string }>;
   destroy: () => void;
   updateAgentConfig: (agentConfig: AgentConfig) => void;
 }
@@ -126,6 +127,59 @@ export const createReplyManager = (
     }
   };
 
+  const processTextMessage = async (
+    text: string,
+    conversationHistory: Message[]
+  ): Promise<{ userMessageId: string; aiMessageId: string }> => {
+    const userMessageId = `user-${Date.now()}`;
+    const aiMessageId = `ai-${Date.now()}`;
+
+    try {
+      // 步驟1：創建用戶消息
+      callbacks.onTranscriptionStart?.(userMessageId);
+      callbacks.onTranscriptionComplete?.(userMessageId, text);
+
+      // 步驟2：開始AI回覆
+      callbacks.onReplyStart?.(aiMessageId);
+
+      // 準備對話歷史
+      const validHistory = conversationHistory
+        .filter(msg => !msg.isLoading && msg.content.trim())
+        .slice(-finalConfig.maxHistoryLength)
+        .map(msg => ({
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        } as ConversationMessage));
+
+      // 步驟3：獲取AI回覆
+      const replyResponse = await axios.post('/api/reply', {
+        message: text,
+        conversationHistory: validHistory,
+        agentConfig: currentAgentConfig,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: finalConfig.timeout,
+      });
+
+      const { reply } = replyResponse.data;
+      callbacks.onReplyComplete?.(aiMessageId, reply);
+
+      // 觸發TTS播放
+      if (reply.trim()) {
+        callbacks.onSpeakReply?.(reply, aiMessageId);
+      }
+
+      return { userMessageId, aiMessageId };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '處理失敗';
+      callbacks.onError?.(errorMessage, userMessageId);
+      throw error;
+    }
+  };
+
   const destroy = () => {
     // 清理資源（如果有的話）
     console.log('ReplyManager destroyed');
@@ -138,6 +192,7 @@ export const createReplyManager = (
 
   return {
     processAudio,
+    processTextMessage,
     destroy,
     updateAgentConfig,
   };

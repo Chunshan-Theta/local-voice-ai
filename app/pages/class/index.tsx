@@ -217,6 +217,7 @@ function ClassChatPage() {
   // 初始化回覆管理器
   useEffect(() => {
     if (!replyManagerRef.current) {
+      console.log('🔧 初始化 ReplyManager...');
       replyManagerRef.current = createReplyManager(
         {
           maxHistoryLength: 10,
@@ -301,6 +302,11 @@ function ClassChatPage() {
           }
         }
       );
+      
+      // 確認 replyManager 已正確初始化
+      console.log('✅ ReplyManager 初始化完成');
+      console.log('📋 可用方法:', Object.keys(replyManagerRef.current));
+      console.log('🔍 processTextMessage 方法存在:', typeof replyManagerRef.current.processTextMessage === 'function');
     }
 
     return () => {
@@ -317,6 +323,35 @@ function ClassChatPage() {
       console.log('✅ 已更新 ReplyManager 的 Agent 配置:', agentConfig.name);
     }
   }, [agentConfig]);
+
+  // 當 agent 準備完成且用戶信息有效時，自動發送破冰消息
+  useEffect(() => {
+    if (agentConfig && isUserInfoValid && replyManagerRef.current && messages.length === 0) {
+      console.log('🎯 Agent 準備完成，發送破冰消息');
+      
+      // 確保 replyManager 已經正確初始化且有 processTextMessage 方法
+      if (typeof replyManagerRef.current.processTextMessage !== 'function') {
+        console.error('❌ processTextMessage 方法不存在，replyManager 可能未完全初始化');
+        return;
+      }
+      
+      // 使用 replyManager 處理破冰消息
+      setTimeout(async () => {
+        try {
+          if (replyManagerRef.current && typeof replyManagerRef.current.processTextMessage === 'function') {
+            // 模擬用戶說了 "hi"，傳遞當前的空消息數組
+            await replyManagerRef.current.processTextMessage('hi', []);
+          } else {
+            console.error('❌ replyManager 或 processTextMessage 方法不可用');
+          }
+        } catch (error) {
+          console.error('破冰消息處理錯誤:', error);
+          // 如果發生錯誤，清除可能存在的loading消息
+          setMessages([]);
+        }
+      }, 500);
+    }
+  }, [agentConfig, isUserInfoValid, messages.length, ttsEnabled]); // 添加 ttsEnabled 依賴，確保 replyManager 已初始化
 
   // 初始化並啟動持續音量監測
   useEffect(() => {
