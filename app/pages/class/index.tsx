@@ -202,10 +202,8 @@ function ClassChatPage() {
       if (replyManagerRef.current) {
         replyManagerRef.current.destroy();
       }
-      // 組件卸載時才停止持續監測
       stopContinuousVolumeMonitoring();
       
-      // 清理音頻資源
       if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -368,13 +366,6 @@ function ClassChatPage() {
   }, []);
 
   // 計算動態閾值 - 使用閾值計算器
-  const getSilenceThreshold = () => {
-    if (thresholdCalculatorRef.current) {
-      return thresholdCalculatorRef.current.getSilenceThreshold();
-    }
-    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.SILENCE_THRESHOLD_OFFSET; // 降級處理
-  };
-  
   const getVoiceThreshold = () => {
     if (thresholdCalculatorRef.current) {
       const isTtsPlaying = ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : false;
@@ -576,8 +567,6 @@ function ClassChatPage() {
       // 這應該由 startConversation 或其他明確的流程控制
       console.log(`🎤 startListening: conversationStarted=${conversationStartedRef.current}`);
       
-      // 持續音量監測應該已經在運行，不需要重複啟動
-      
     } catch (err) {
       console.error('錄音錯誤:', err);
       setError('無法訪問麥克風，請檢查權限設置');
@@ -609,7 +598,7 @@ function ClassChatPage() {
     setConversationStarted(false);
     conversationStartedRef.current = false;
     stopRecording();
-    stopVolumeMonitoring(); // 只停止錄音相關的監測
+    // 不停止持續監測，保持音量監控運行
     stopSpeaking();
     
     // 如果有對話內容，顯示生成報告按鈕
@@ -619,12 +608,9 @@ function ClassChatPage() {
       setMessages([]);
     }
     
-    // 清除等待狀態
     setWaitingForVoiceAfterTts(false);
     waitingForVoiceAfterTtsRef.current = false;
     
-    // 不關閉音頻流和分析器，保持持續監測
-    // 只重置語音檢測狀態
     setHasDetectedVoice(false);
     hasDetectedVoiceRef.current = false;
   };
@@ -632,8 +618,6 @@ function ClassChatPage() {
   const startConversation = async () => {
     await calibrateEnvironmentalNoise();
     setTimeout(() => {
-      // 持續音量監測應該已經在運行
-      // 第一次對話也設置為等待語音觸發模式
       console.log('🎤 校準完成，進入等待語音觸發模式');
       console.log('✅ 設置 conversationStarted = true');
       setConversationStarted(true);
@@ -687,44 +671,13 @@ function ClassChatPage() {
 
     } catch (err) {
       console.error('處理錯誤:', err);
-      // 錯誤處理已在replyManager的callback中處理，這裡不需要重複處理
-      // 但如果是網絡錯誤等其他錯誤，也要確保能重新進入等待狀態
     } finally {
       setLoading(false);
       
-      // 音頻處理完成後，如果對話已開始且沒有在錄音，準備等待TTS完成或重新等待語音觸發
       if (conversationStartedRef.current && !isListeningRef.current) {
         console.log('🎤 音頻處理完成，準備等待TTS播放和語音觸發');
-        // 如果沒有錯誤，等待狀態將由TTS的onEnd回調設置
-        // 如果有錯誤，等待狀態將由replyManager的onError回調設置
       }
     }
-  };
-
-  const getVolumeBarColor = () => {
-    if (isCalibrating) return '#ffc107';
-    if (isInterrupting) return '#e91e63'; // 粉紅色 - 打斷中
-    if (!isListening && !waitingForVoiceAfterTts) return '#6c757d';
-    
-    const voiceThreshold = getVoiceThreshold();
-    const silenceThreshold = getSilenceThreshold();
-    const interruptThreshold = getInterruptThreshold();
-    
-    // TTS 播放時的特殊顏色
-    if (ttsManagerRef.current && ttsManagerRef.current.isSpeaking()) {
-      if (currentVolume >= interruptThreshold) return '#ff5722'; // 深橙色 - 觸發搶話閾值
-      if (currentVolume >= voiceThreshold) return '#ff9800'; // 橙色 - 接近搶話閾值
-      return '#9c27b0'; // 紫色 - TTS 播放中
-    }
-    
-    if (currentVolume >= voiceThreshold) return '#28a745'; // 綠色 - 語音
-    if (currentVolume >= silenceThreshold) return '#fd7e14'; // 橙色 - 中等
-    return '#dc3545'; // 紅色 - 靜音
-  };
-
-  const getVolumePercentage = () => {
-    const maxDisplayVolume = Math.max(getVoiceThreshold() * 2, 100);
-    return Math.min((currentVolume / maxDisplayVolume) * 100, 100);
   };
 
   // 持續音量監測 - 獨立於錄音狀態
@@ -752,18 +705,6 @@ function ClassChatPage() {
         
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         setCurrentVolume(average);
-        
-        // 詳細的狀態調試信息（每5秒輸出一次）
-        // if (Math.round(Date.now() / 1000) % 5 === 0) {
-        //   console.log(`📊 狀態檢查: 
-        //     - waitingForVoiceAfterTts: ${waitingForVoiceAfterTtsRef.current}
-        //     - isListening: ${isListeningRef.current} 
-        //     - isSpeaking: ${ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : 'unknown'}
-        //     - isInterrupting: ${isInterruptingRef.current}
-        //     - 當前音量: ${average.toFixed(1)}
-        //     - 語音閾值: ${getVoiceThreshold().toFixed(1)}
-        //     - 搶話閾值: ${getInterruptThreshold().toFixed(1)}`);
-        // }
         
         // 打斷邏輯：TTS 播放時檢測搶話
         if (ttsManagerRef.current && ttsManagerRef.current.isSpeaking() && 
@@ -846,29 +787,6 @@ function ClassChatPage() {
     }
   };
 
-  // 簡化的音量檢測循環（保留用於向後兼容）
-  const startVolumeMonitoring = () => {
-    // 現在直接使用持續監測
-    if (!continuousVolumeCheckRef.current) {
-      startContinuousVolumeMonitoring();
-    }
-  };
-
-  const stopVolumeMonitoring = () => {
-    // 不再停止持續監測，只清理錄音相關的定時器
-    if (continuousVolumeCheckRef.current) {
-      clearInterval(continuousVolumeCheckRef.current);
-      continuousVolumeCheckRef.current = null;
-    }
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('zh-TW', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-
   // 生成對話報告
   const generateReport = async () => {
     if (messages.length === 0) return;
@@ -947,7 +865,6 @@ function ClassChatPage() {
             conversationStarted={conversationStarted}
           />
 
-          {/* 底部控制區域 */}
           <div style={{
             position: 'fixed',
             bottom: 0,
