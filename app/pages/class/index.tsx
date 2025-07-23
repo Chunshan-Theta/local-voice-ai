@@ -888,6 +888,25 @@ function ClassChatPage() {
       )}
       
       {/* CSS Styles */}
+      <style jsx global>{`
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden;
+        }
+        
+        html, body, #__next {
+          height: 100%;
+          width: 100%;
+        }
+      `}</style>
+      
       <style jsx>{`
         @keyframes pulse {
           0% { transform: scale(1); }
