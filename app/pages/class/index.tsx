@@ -22,7 +22,7 @@ import {
 
 // Import from the existing types system
 import { AgentConfig } from "./types";
-import { UserInfoModal, type UserInfo } from "./components";
+import { UserInfoModal, type UserInfo, ChatRoom } from "./components";
 
 // Simple language type definition
 type Language = 'zh' | 'en';
@@ -133,7 +133,6 @@ function ClassChatPage() {
   const conversationStartedRef = useRef(false);
   const baselineNoiseRef = useRef(10);
   const recordingStartTimeRef = useRef<number>(0);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const isInterruptingRef = useRef(false);
   const interruptCheckCountRef = useRef(0);
@@ -487,11 +486,6 @@ function ClassChatPage() {
       startListening();
     }, 100);
   };
-
-  // 自動滾動到最新消息
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   // TTS 相關函數
   const speakText = (text: string, messageId?: string) => {
@@ -1039,55 +1033,10 @@ function ClassChatPage() {
       {isUserInfoValid && agentConfig && !localLoading && (
         <>
           {/* 聊天記錄區域 */}
-          <div style={{ 
-            flex: 1,
-            padding: '80px 20px 120px 20px',
-            overflow: 'auto'
-          }}>
-            {messages.length === 0 ? (
-              <div style={{ 
-                textAlign: 'center', 
-                color: 'rgba(255, 255, 255, 0.7)', 
-                marginTop: '40vh',
-                fontSize: '16px'
-              }}>
-                {conversationStarted ? '🎤 開始說話來進行對話...' : '點擊開始按鈕來開始對話'}
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
-                    marginBottom: '15px'
-                  }}
-                >
-                  <div
-                    style={{
-                      maxWidth: '80%',
-                      padding: '12px 16px',
-                      borderRadius: '18px',
-                      backgroundColor: message.type === 'user' 
-                        ? 'rgba(255, 255, 255, 0.9)' 
-                        : 'rgba(255, 255, 255, 0.1)',
-                      color: message.type === 'user' ? '#333' : 'white',
-                      fontSize: '16px',
-                      lineHeight: '1.4',
-                      opacity: message.isLoading ? 0.7 : 1,
-                      border: message.type === 'ai' ? '1px solid rgba(255, 255, 255, 0.2)' : 'none'
-                    }}
-                  >
-                    {message.content}
-                    {message.isLoading && (
-                      <span style={{ marginLeft: '8px' }}>⏳</span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+          <ChatRoom 
+            messages={messages}
+            conversationStarted={conversationStarted}
+          />
 
           {/* 底部控制區域 */}
           <div style={{
