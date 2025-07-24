@@ -67,7 +67,7 @@ const BottomControlPanel: React.FC<BottomControlPanelProps> = ({
       display: 'flex',
       flexDirection: 'column',
       gap: '15px',
-      height: '150px',
+      maxHeight: '150px',
     }}>
       {/* 輸入區域和控制按鈕 */}
       <div style={{

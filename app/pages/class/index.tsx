@@ -21,10 +21,10 @@ import {
 } from '../../lib/replyManager';
 
 // Import from the existing types system
-import { AgentConfig } from "./types";
-import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar, BottomControlPanel } from "./components";
-import { AgentConfigManager } from "./utils/agentConfigManager";
-import { type Language } from "./utils/agentFactory";
+import { AgentConfig } from "../../src/class/types";
+import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar, BottomControlPanel } from "../../src/class/components";
+import { AgentConfigManager } from "../../src/class/utils/agentConfigManager";
+import { type Language } from "../../src/class/utils/agentFactory";
 
 function ClassChatPage() {
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
@@ -124,7 +124,7 @@ function ClassChatPage() {
         {
           enabled: ttsEnabled,
           voice: null,
-          rate: 1.0,
+          rate: 1.5,
           volume: 0.8,
           pitch: 1.0
         },
@@ -217,10 +217,12 @@ function ClassChatPage() {
   // 初始化回覆管理器
   useEffect(() => {
     if (!replyManagerRef.current) {
+      console.log('🔧 初始化 ReplyManager...');
       replyManagerRef.current = createReplyManager(
         {
           maxHistoryLength: 10,
           timeout: 60000,
+          // 不在這裡設置 agentConfig，會在後面的 useEffect 中更新
         },
         {
           onTranscriptionStart: (messageId) => {
@@ -300,6 +302,11 @@ function ClassChatPage() {
           }
         }
       );
+      
+      // 確認 replyManager 已正確初始化
+      console.log('✅ ReplyManager 初始化完成');
+      console.log('📋 可用方法:', Object.keys(replyManagerRef.current));
+      console.log('🔍 processTextMessage 方法存在:', typeof replyManagerRef.current.processTextMessage === 'function');
     }
 
     return () => {
@@ -308,6 +315,71 @@ function ClassChatPage() {
       }
     };
   }, [ttsEnabled]);
+
+  // 當 agentConfig 變化時更新 replyManager
+  useEffect(() => {
+    if (replyManagerRef.current && agentConfig) {
+      console.log('🔄 更新 ReplyManager 的 Agent 配置:', agentConfig.name);
+      console.log('📋 AgentConfig 詳細信息:');
+      console.log('  - Name:', agentConfig.name);
+      console.log('  - Instructions length:', agentConfig.instructions.length);
+      console.log('  - Voice:', agentConfig.voice);
+      console.log('  - Language:', agentConfig.lang);
+      
+      replyManagerRef.current.updateAgentConfig(agentConfig);
+      console.log('✅ ReplyManager Agent 配置已更新');
+    } else if (agentConfig) {
+      console.log('⚠️ ReplyManager 尚未初始化，agentConfig 將在下次 useEffect 中設置');
+      console.log('📋 等待設置的 agentConfig:', agentConfig.name);
+    }
+  }, [agentConfig]);
+
+  // 當 agent 準備完成且用戶信息有效時，自動發送破冰消息
+  useEffect(() => {
+    if (agentConfig && isUserInfoValid && replyManagerRef.current && messages.length === 0) {
+      console.log('🎯 Agent 準備完成，準備發送破冰消息');
+      console.log('📋 當前 agentConfig:', agentConfig.name);
+      console.log('👤 用戶信息有效:', isUserInfoValid);
+      console.log('🔧 ReplyManager 存在:', !!replyManagerRef.current);
+      console.log('💬 消息數量:', messages.length);
+      
+      // 確保 replyManager 已經正確初始化且有 processTextMessage 方法
+      if (typeof replyManagerRef.current.processTextMessage !== 'function') {
+        console.error('❌ processTextMessage 方法不存在，replyManager 可能未完全初始化');
+        return;
+      }
+      
+      // 先確保 agentConfig 已經設置到 replyManager 中
+      console.log('🔄 破冰消息前確保 agentConfig 已設置');
+      replyManagerRef.current.updateAgentConfig(agentConfig);
+      
+      // 使用 replyManager 處理破冰消息
+      setTimeout(async () => {
+        try {
+          if (replyManagerRef.current && typeof replyManagerRef.current.processTextMessage === 'function') {
+            console.log('🚀 開始處理破冰消息...');
+            console.log('📋 最終確認 agentConfig 已設置:', agentConfig.name);
+            
+            // 模擬用戶說了 "hi"，傳遞當前的空消息數組
+            await replyManagerRef.current.processTextMessage('hi', []);
+            console.log('✅ 破冰消息處理完成');
+          } else {
+            console.error('❌ replyManager 或 processTextMessage 方法不可用');
+          }
+        } catch (error) {
+          console.error('❌ 破冰消息處理錯誤:', error);
+          // 如果發生錯誤，清除可能存在的loading消息
+          setMessages([]);
+        }
+      }, 1000); // 增加延遲確保所有初始化完成
+    } else {
+      console.log('🔍 破冰消息條件檢查:');
+      console.log('  - agentConfig:', !!agentConfig, agentConfig?.name);
+      console.log('  - isUserInfoValid:', isUserInfoValid);
+      console.log('  - replyManagerRef.current:', !!replyManagerRef.current);
+      console.log('  - messages.length:', messages.length);
+    }
+  }, [agentConfig, isUserInfoValid, messages.length, ttsEnabled]); // 添加 ttsEnabled 依賴，確保 replyManager 已初始化
 
   // 初始化並啟動持續音量監測
   useEffect(() => {
@@ -863,6 +935,7 @@ function ClassChatPage() {
           <ChatRoom 
             messages={messages}
             conversationStarted={conversationStarted}
+            agentConfig={agentConfig}
           />
 
           {/* 底部控制面板 */}

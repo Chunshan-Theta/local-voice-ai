@@ -4,6 +4,9 @@ export {
   createCustomAgentConfig, 
   validateAgentConfig, 
   cloneAgentConfig,
+  createAgentConfig,
+  fetchAgentConfig,
+  handleApiTools,
   type Language 
 } from './agentFactory';
 

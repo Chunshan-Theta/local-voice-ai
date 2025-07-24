@@ -1,4 +1,5 @@
-import { Language } from "../i18n/translations";
+// import { Language } from "../i18n/translations";
+export type Language = "en" | "zh" | "es" | "fr"; // Replace with actual supported languages
 
 export type SessionStatus = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 

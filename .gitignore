@@ -71,5 +71,5 @@ Thumbs.db
 k8s/gcp_deploy.sh 
 
 # DEV Setting
-docker-compose.dev.yml
+docker-compose-dev.yml
 app/tmp/*.webm

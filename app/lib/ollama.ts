@@ -1,6 +1,7 @@
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
+import type { AgentConfig } from '../src/class/types/basic';
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -10,6 +11,24 @@ export interface ConversationMessage {
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://site.ollama.lazyinwork.com';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:1b';
 const WHISPER_SERVICE_URL = process.env.WHISPER_SERVICE_URL || 'http://whisper-service:5001';
+
+// 清理回應中不適合語音發音的內容
+function cleanResponseForSpeech(text: string): string {
+  // 移除小括弧內的描述性內容（如動作、情感、聲音描述等）
+  let cleaned = text.replace(/\（[^）]*\）/g, '');
+  cleaned = cleaned.replace(/\([^)]*\)/g, '');
+  
+  // 移除方括弧內的描述性內容
+  cleaned = cleaned.replace(/\[[^\]]*\]/g, '');
+  
+  // 移除星號包圍的動作描述
+  cleaned = cleaned.replace(/\*[^*]*\*/g, '');
+  
+  // 移除多餘的空白
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
 
 export async function whisperWithOllama(audioFilePath: string): Promise<string> {
   console.log('Processing audio file with local Python Whisper service:', audioFilePath);
@@ -65,13 +84,47 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
 
 export async function chatWithOllama(
   userMessage: string, 
-  conversationHistory: ConversationMessage[] = []
+  conversationHistory: ConversationMessage[] = [],
+  agentConfig?: AgentConfig
 ): Promise<string> {
   console.log('Sending message to Ollama:', userMessage);
   console.log('Conversation history length:', conversationHistory.length);
+  console.log('Agent config details:', {
+    exists: !!agentConfig,
+    name: agentConfig?.name || 'No name',
+    instructionsLength: agentConfig?.instructions?.length || 0,
+    voice: agentConfig?.voice || 'No voice',
+    lang: agentConfig?.lang || 'No lang'
+  });
   
-  // 系統提示詞 - 讓 AI 表現得像真人
-  const systemPrompt = `你是一個友善、自然的語音對話夥伴。請用遵守以下方式回應：
+  if (agentConfig && agentConfig.instructions) {
+    console.log('Using agent config instructions (first 200 chars):', agentConfig.instructions.substring(0, 200) + '...');
+  } else {
+    console.log('⚠️ Using default system prompt - no agent config or instructions provided');
+  }
+  
+  // 系統提示詞 - 根據 agent 配置或使用預設
+  let systemPrompt: string;
+  
+  if (agentConfig && agentConfig.instructions) {
+    console.log('✅ Using agent config instructions');
+    // 使用 agent 配置中的指示
+    systemPrompt = `${agentConfig.instructions}
+
+額外指示：
+- 使用自然、口語化的表達方式，就像真人對話一樣
+- 回應要簡潔明瞭，通常 1-2 句話即可
+- 適當使用語氣詞和表達情感
+- 這是語音對話，你的回應會被朗讀出來，所以要聽起來自然流暢
+- 使用語氣詞和尾音來表達情感，不要使用表情符號、小括弧包含狀態或是小括弧包含聲音語氣風格等，例如「😊」、「（停頓，語氣無奈）」、「（聲音顫抖，有點不自信）」
+
+${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
+    
+    console.log('📋 Generated system prompt (first 300 chars):', systemPrompt.substring(0, 300) + '...');
+  } else {
+    console.log('⚠️ Using default system prompt - no agent config available');
+    // 預設系統提示詞
+    systemPrompt = `你是一個友善、自然的語音對話夥伴。請用遵守以下方式回應：
 
 1. 使用自然、口語化的表達方式，就像真人對話一樣
 2. 回應要簡潔明瞭，通常 1-2 句話即可
@@ -84,6 +137,7 @@ export async function chatWithOllama(
 9. 不要有表情符號等非口語對話內容，例如不要使用「😊」這樣的表情符號
 
 請記住，這是語音對話，你的回應會被朗讀出來，所以要聽起來自然流暢。`;
+  }
 
   try {
     // 構建完整的對話上下文
@@ -119,8 +173,13 @@ export async function chatWithOllama(
 
     if (response.data && response.data.response) {
       const reply = response.data.response.trim();
-      console.log('Ollama response:', reply);
-      return reply;
+      console.log('Ollama original response:', reply);
+      
+      // 清理回應中不適合語音發音的內容
+      const cleanedReply = cleanResponseForSpeech(reply);
+      console.log('Ollama cleaned response:', cleanedReply);
+      
+      return cleanedReply;
     } else {
       throw new Error('未收到有效回應');
     }
