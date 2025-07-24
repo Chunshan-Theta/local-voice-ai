@@ -15,6 +15,7 @@ RUN npm install
 # Copy Next.js source and build
 COPY pages ./pages
 COPY lib ./lib
+COPY src ./src
 COPY *.json ./
 COPY *.js ./
 COPY *.ts ./

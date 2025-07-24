@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { chatWithOllama } from '../../lib/ollama';
-import type { AgentConfig } from '../class/types/basic';
+import type { AgentConfig } from '../../src/class/types/basic';
 
 interface ConversationMessage {
   role: 'user' | 'assistant';

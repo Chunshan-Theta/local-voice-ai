@@ -1,7 +1,7 @@
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
-import type { AgentConfig } from '../pages/class/types/basic';
+import type { AgentConfig } from '../src/class/types/basic';
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { ConversationMessage } from './ollama';
-import type { AgentConfig } from '../pages/class/types/basic';
+import type { AgentConfig } from '../src/class/types/basic';
 
 export interface Message {
   id: string;

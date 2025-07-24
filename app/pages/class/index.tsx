@@ -21,10 +21,10 @@ import {
 } from '../../lib/replyManager';
 
 // Import from the existing types system
-import { AgentConfig } from "./types";
-import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar, BottomControlPanel } from "./components";
-import { AgentConfigManager } from "./utils/agentConfigManager";
-import { type Language } from "./utils/agentFactory";
+import { AgentConfig } from "../../src/class/types";
+import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar, BottomControlPanel } from "../../src/class/components";
+import { AgentConfigManager } from "../../src/class/utils/agentConfigManager";
+import { type Language } from "../../src/class/utils/agentFactory";
 
 function ClassChatPage() {
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
