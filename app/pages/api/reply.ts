@@ -32,9 +32,23 @@ export default async function handler(
       return res.status(400).json({ error: '訊息不能為空' });
     }
 
+    console.log('📥 API received request:');
     console.log('Processing message:', message);
     console.log('Conversation history length:', conversationHistory.length);
-    console.log('Agent config:', agentConfig?.name || 'No agent config');
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Agent config received:', {
+      exists: !!agentConfig,
+      name: agentConfig?.name || 'No name',
+      instructionsLength: agentConfig?.instructions?.length || 0,
+      voice: agentConfig?.voice || 'No voice',
+      lang: agentConfig?.lang || 'No lang'
+    });
+    
+    if (agentConfig && agentConfig.instructions) {
+      console.log('Agent instructions preview:', agentConfig.instructions.substring(0, 100) + '...');
+    } else {
+      console.log('⚠️ No agent config or instructions provided, using default system prompt');
+    }
 
     // AI 聊天回覆，傳入對話歷史和 agent 配置
     const reply = await chatWithOllama(message, conversationHistory, agentConfig);

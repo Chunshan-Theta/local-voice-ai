@@ -99,6 +99,9 @@ export const createReplyManager = (
       console.log('Conversation history:', validHistory);
 
       // 步驟3：獲取AI回覆
+      console.log('🔄 準備發送請求到 /api/reply');
+      console.log('📋 當前 agentConfig:', currentAgentConfig?.name || 'No agent config');
+      
       const replyResponse = await axios.post('/api/reply', {
         message: transcript,
         conversationHistory: validHistory,
@@ -111,6 +114,7 @@ export const createReplyManager = (
       });
 
       const { reply } = replyResponse.data;
+      console.log('✅ 收到 AI 回覆:', reply.substring(0, 50) + '...');
       callbacks.onReplyComplete?.(aiMessageId, reply);
 
       // 觸發TTS播放
@@ -152,11 +156,37 @@ export const createReplyManager = (
         } as ConversationMessage));
 
       // 步驟3：獲取AI回覆
-      const replyResponse = await axios.post('/api/reply', {
+      console.log('🔄 processTextMessage 準備發送請求到 /api/reply');
+      console.log('📋 當前 agentConfig:', currentAgentConfig?.name || 'No agent config');
+      console.log('💬 用戶消息:', text);
+      
+      // 檢查 agentConfig 的完整性
+      if (currentAgentConfig) {
+        console.log('🔍 agentConfig 詳細檢查:');
+        console.log('  - Name:', currentAgentConfig.name);
+        console.log('  - Instructions exist:', !!currentAgentConfig.instructions);
+        console.log('  - Instructions length:', currentAgentConfig.instructions?.length || 0);
+        console.log('  - Instructions preview:', currentAgentConfig.instructions?.substring(0, 100) + '...' || 'No instructions');
+        console.log('  - Voice:', currentAgentConfig.voice);
+        console.log('  - Lang:', currentAgentConfig.lang);
+      } else {
+        console.log('❌ currentAgentConfig is null or undefined');
+      }
+      
+      const requestPayload = {
         message: text,
         conversationHistory: validHistory,
         agentConfig: currentAgentConfig,
-      }, {
+      };
+      
+      console.log('📤 Request payload summary:', {
+        message: text,
+        historyLength: validHistory.length,
+        agentConfigExists: !!currentAgentConfig,
+        agentConfigName: currentAgentConfig?.name || 'No name'
+      });
+      
+      const replyResponse = await axios.post('/api/reply', requestPayload, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -164,6 +194,7 @@ export const createReplyManager = (
       });
 
       const { reply } = replyResponse.data;
+      console.log('✅ processTextMessage 收到 AI 回覆:', reply.substring(0, 50) + '...');
       callbacks.onReplyComplete?.(aiMessageId, reply);
 
       // 觸發TTS播放
@@ -187,7 +218,12 @@ export const createReplyManager = (
 
   const updateAgentConfig = (agentConfig: AgentConfig) => {
     currentAgentConfig = agentConfig;
-    console.log('ReplyManager agent config updated:', agentConfig.name);
+    console.log('🔄 ReplyManager agent config updated:', agentConfig.name);
+    console.log('📋 Agent config details:');
+    console.log('  - Name:', agentConfig.name);
+    console.log('  - Instructions length:', agentConfig.instructions.length);
+    console.log('  - Voice:', agentConfig.voice);
+    console.log('  - Language:', agentConfig.lang);
   };
 
   return {

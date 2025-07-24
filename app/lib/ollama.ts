@@ -71,12 +71,25 @@ export async function chatWithOllama(
 ): Promise<string> {
   console.log('Sending message to Ollama:', userMessage);
   console.log('Conversation history length:', conversationHistory.length);
-  console.log('Using agent config:', agentConfig?.name || 'Default system prompt');
+  console.log('Agent config details:', {
+    exists: !!agentConfig,
+    name: agentConfig?.name || 'No name',
+    instructionsLength: agentConfig?.instructions?.length || 0,
+    voice: agentConfig?.voice || 'No voice',
+    lang: agentConfig?.lang || 'No lang'
+  });
+  
+  if (agentConfig && agentConfig.instructions) {
+    console.log('Using agent config instructions (first 200 chars):', agentConfig.instructions.substring(0, 200) + '...');
+  } else {
+    console.log('⚠️ Using default system prompt - no agent config or instructions provided');
+  }
   
   // 系統提示詞 - 根據 agent 配置或使用預設
   let systemPrompt: string;
   
-  if (agentConfig) {
+  if (agentConfig && agentConfig.instructions) {
+    console.log('✅ Using agent config instructions');
     // 使用 agent 配置中的指示
     systemPrompt = `${agentConfig.instructions}
 
@@ -88,7 +101,10 @@ export async function chatWithOllama(
 - 不要使用表情符號或小括弧包含狀態，例如「😊」、「（停頓，語氣無奈）」
 
 ${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
+    
+    console.log('📋 Generated system prompt (first 300 chars):', systemPrompt.substring(0, 300) + '...');
   } else {
+    console.log('⚠️ Using default system prompt - no agent config available');
     // 預設系統提示詞
     systemPrompt = `你是一個友善、自然的語音對話夥伴。請用遵守以下方式回應：
 
