@@ -12,6 +12,24 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://site.ollama.lazy
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:1b';
 const WHISPER_SERVICE_URL = process.env.WHISPER_SERVICE_URL || 'http://whisper-service:5001';
 
+// 清理回應中不適合語音發音的內容
+function cleanResponseForSpeech(text: string): string {
+  // 移除小括弧內的描述性內容（如動作、情感、聲音描述等）
+  let cleaned = text.replace(/\（[^）]*\）/g, '');
+  cleaned = cleaned.replace(/\([^)]*\)/g, '');
+  
+  // 移除方括弧內的描述性內容
+  cleaned = cleaned.replace(/\[[^\]]*\]/g, '');
+  
+  // 移除星號包圍的動作描述
+  cleaned = cleaned.replace(/\*[^*]*\*/g, '');
+  
+  // 移除多餘的空白
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
+
 export async function whisperWithOllama(audioFilePath: string): Promise<string> {
   console.log('Processing audio file with local Python Whisper service:', audioFilePath);
   
@@ -98,7 +116,7 @@ export async function chatWithOllama(
 - 回應要簡潔明瞭，通常 1-2 句話即可
 - 適當使用語氣詞和表達情感
 - 這是語音對話，你的回應會被朗讀出來，所以要聽起來自然流暢
-- 不要使用表情符號或小括弧包含狀態，例如「😊」、「（停頓，語氣無奈）」
+- 使用語氣詞和尾音來表達情感，不要使用表情符號、小括弧包含狀態或是小括弧包含聲音語氣風格等，例如「😊」、「（停頓，語氣無奈）」、「（聲音顫抖，有點不自信）」
 
 ${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
     
@@ -155,8 +173,13 @@ ${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
 
     if (response.data && response.data.response) {
       const reply = response.data.response.trim();
-      console.log('Ollama response:', reply);
-      return reply;
+      console.log('Ollama original response:', reply);
+      
+      // 清理回應中不適合語音發音的內容
+      const cleanedReply = cleanResponseForSpeech(reply);
+      console.log('Ollama cleaned response:', cleanedReply);
+      
+      return cleanedReply;
     } else {
       throw new Error('未收到有效回應');
     }
