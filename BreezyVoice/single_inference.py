@@ -218,7 +218,7 @@ class CustomCosyVoice:
                                           '{}/spk2info.pt'.format(model_dir),
                                           instruct,
                                           configs['allowed_special'])
-        self.model = CosyVoiceModel(configs['llm'], configs['flow'], configs['hift'])
+        self.model = CustomCosyVoiceModel(configs['llm'], configs['flow'], configs['hift'])
         self.model.load('{}/llm.pt'.format(model_dir),
                         '{}/flow.pt'.format(model_dir),
                         '{}/hift.pt'.format(model_dir))
