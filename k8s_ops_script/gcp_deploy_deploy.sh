@@ -49,10 +49,12 @@ echo "🔄 Updating image paths in deployment files..."
 # 备份原始文件
 cp app-deployment.yaml app-deployment.yaml.bak
 cp whisper-deployment.yaml whisper-deployment.yaml.bak
+cp breezyvoice-deployment.yaml breezyvoice-deployment.yaml.bak
 
 # 替换镜像路径
 sed -i "s|gcr.io/$PROJECT_ID/local-voice-ai:latest|$REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest|g" app-deployment.yaml
 sed -i "s|gcr.io/$PROJECT_ID/whisper-service:latest|$REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest|g" whisper-deployment.yaml
+sed -i "s|breezyvoice:latest|$REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/breezyvoice:latest|g" breezyvoice-deployment.yaml
 
 # # Apply PVC first
 # echo "📦 Applying PVC..."
@@ -67,12 +69,14 @@ echo "🚀 Applying deployments..."
 kubectl apply -f whisper-deployment.yaml
 kubectl apply -f ollama-deployment.yaml
 kubectl apply -f app-deployment.yaml
+kubectl apply -f breezyvoice-deployment.yaml
 
 # Apply services
 echo "🔌 Applying services..."
 kubectl apply -f whisper-service.yaml
 kubectl apply -f ollama-service.yaml
 kubectl apply -f app-service.yaml
+kubectl apply -f breezyvoice-service.yaml
 
 # Apply ingress
 echo "🌐 Applying ingress..."
@@ -83,6 +87,7 @@ echo "⏳ Waiting for pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=whisper --timeout=300s
 kubectl wait --for=condition=ready pod -l app=ollama --timeout=300s
 kubectl wait --for=condition=ready pod -l app=nextjs-app --timeout=300s
+kubectl wait --for=condition=ready pod -l app=breezyvoice --timeout=300s
 
 echo "✅ Deployment completed!"
 
@@ -92,6 +97,7 @@ kubectl get pods
 echo "🎮 GPU allocation status:"
 kubectl get pods -l app=whisper -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,GPU:.spec.containers[0].resources.limits.nvidia\\.com/gpu
 kubectl get pods -l app=ollama -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,GPU:.spec.containers[0].resources.limits.nvidia\\.com/gpu
+kubectl get pods -l app=breezyvoice -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,GPU:.spec.containers[0].resources.limits.nvidia\\.com/gpu
 
 # Show service status
 echo "🔍 Service status:"
@@ -113,18 +119,21 @@ To verify GPU setup:
 1. Check GPU node: kubectl describe node <node-name> | grep nvidia.com/gpu
 2. Check Whisper pod logs: kubectl logs -l app=whisper
 3. Check Ollama pod logs: kubectl logs -l app=ollama
-4. Access health endpoint to verify GPU detection
+4. Check BreezyVoice pod logs: kubectl logs -l app=breezyvoice
+5. Access health endpoint to verify GPU detection
 
 🔗 Port forwarding options:
 To access services locally via port forwarding:
 - NextJS App: kubectl port-forward service/nextjs-app 3000:3000
 - Whisper Service: kubectl port-forward service/whisper-service 5001:5001
 - Ollama Service: kubectl port-forward service/ollama-service 11434:11434
+- BreezyVoice Service: kubectl port-forward service/breezyvoice 8999:8080
 
 Then access:
 - NextJS App: http://localhost:3000
 - Whisper API: http://localhost:5001
 - Ollama API: http://localhost:11434
+- BreezyVoice API: http://localhost:8999
 "
 
 # 恢复部署文件到原始状态
@@ -134,6 +143,9 @@ if [ -f app-deployment.yaml.bak ]; then
 fi
 if [ -f whisper-deployment.yaml.bak ]; then
     mv whisper-deployment.yaml.bak whisper-deployment.yaml
+fi
+if [ -f breezyvoice-deployment.yaml.bak ]; then
+    mv breezyvoice-deployment.yaml.bak breezyvoice-deployment.yaml
 fi
 
 echo -e "\n${GREEN}🎉 Deployment scripts created!${NC}"

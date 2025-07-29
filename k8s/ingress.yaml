@@ -57,3 +57,25 @@ spec:
                 name: whisper-service
                 port:
                   number: 5001
+
+# BreezyVoice 服務 Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: voice-ai-ingress-breezyvoice
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+    cloud.google.com/health-check-path: "/models"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: breezyvoice
+                port:
+                  number: 8080

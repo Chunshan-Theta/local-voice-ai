@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: breezyvoice
+  labels:
+    app: breezyvoice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: breezyvoice
+  template:
+    metadata:
+      labels:
+        app: breezyvoice
+    spec:
+      containers:
+      - name: breezyvoice
+        image: us-west4-docker.pkg.dev/ai-test-465504/local-voice-ai-repo/breezyvoice:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        command: ["/breezyvoice/.venv/bin/python"]
+        args: ["api.py"]
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: TORCH_CUDA_ARCH_LIST
+          value: "7.5;8.0;8.6"
+        - name: OMP_NUM_THREADS
+          value: "1"
+        - name: CUDA_LAUNCH_BLOCKING
+          value: "0"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+        readinessProbe:
+          httpGet:
+            path: /models
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /models
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        volumeMounts:
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface/
+      volumes:
+      - name: hf-cache
+        emptyDir: {} 
