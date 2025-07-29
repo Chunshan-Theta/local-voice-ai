@@ -24,11 +24,11 @@ class Settings(BaseSettings):
         description="Specifies the model used for speech synthesis.",
     )
     speaker_prompt_audio_path: str = Field(
-        default="./data/example.wav",
+        default="./data/example.mp3",
         description="Specifies the path to the prompt speech audio file of the speaker.",
     )
     speaker_prompt_text_transcription: str = Field(
-        default="在密碼學中，加密是將明文資訊改變為難以讀取的密文內容，使之不可讀的方法。只有擁有解密方法的對象，經由解密過程，才能將密文還原為正常可讀的內容。",
+        default="親愛的，累了一天辛苦了。讓我們一起深呼吸，慢慢放鬆身心。",
         description="Specifies the transcription of the speaker prompt audio.",
     )
 
@@ -110,4 +110,4 @@ async def speach_endpoint(request: Request, payload: SpeechRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=8080)
+    uvicorn.run("api:app", host="0.0.0.0", port=8080, timeout_graceful_shutdown=300)
