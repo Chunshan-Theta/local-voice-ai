@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         description="Specifies the model used for speech synthesis.",
     )
     speaker_prompt_audio_path: str = Field(
-        default="./data/example.mp3",
+        default="./data/example.wav",
         description="Specifies the path to the prompt speech audio file of the speaker.",
     )
     speaker_prompt_text_transcription: str = Field(

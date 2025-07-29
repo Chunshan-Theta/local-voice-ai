@@ -170,7 +170,29 @@ function ClassChatPage() {
             }, 500);
           },
           onError: (error, messageId) => {
-            console.error('❌ TTS 錯誤:', error.error);
+            console.error('❌ TTS 錯誤:', error);
+            // 添加更詳細的錯誤日誌
+            if (error.status) {
+              console.error(`TTS API 錯誤狀態碼: ${error.status}`);
+            }
+            if (error.message) {
+              console.error(`TTS 錯誤信息: ${error.message}`);
+            }
+            if (error.response) {
+              console.error('TTS 響應詳情:', error.response);
+            }
+            
+            // 根據錯誤類型設置不同的錯誤信息
+            let errorMessage = '語音合成失敗';
+            if (error.status === 502) {
+              errorMessage = 'TTS 服務暫時不可用，請稍後再試';
+            } else if (error.status === 400) {
+              errorMessage = '無效的語音合成請求';
+            } else if (error.status === 413) {
+              errorMessage = '文本內容過長';
+            }
+            
+            setError(errorMessage);
             setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
             
             // TTS錯誤後也要等待語音輸入
@@ -497,9 +519,33 @@ function ClassChatPage() {
   };
 
   // TTS 相關函數
-  const speakText = (text: string, messageId?: string) => {
-    if (ttsManagerRef.current) {
-      ttsManagerRef.current.speak(text, messageId);
+  const speakText = async (text: string, messageId?: string) => {
+    if (!text?.trim()) {
+      console.warn('⚠️ 嘗試播放空文本');
+      return;
+    }
+
+    if (!ttsManagerRef.current) {
+      console.error('❌ TTS 管理器未初始化');
+      return;
+    }
+
+    try {
+      console.log(`🔊 開始語音合成: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+      console.log(`📋 消息ID: ${messageId || '無'}`);
+      
+      // 檢查文本長度
+      if (text.length > 1000) {
+        console.warn(`⚠️ 文本過長 (${text.length} 字符)，可能需要分段處理`);
+      }
+
+      await ttsManagerRef.current.speak(text, messageId);
+    } catch (error) {
+      console.error('❌ 語音合成錯誤:', error);
+      setError('語音合成失敗，請稍後再試');
+      
+      // 錯誤發生時重置播放狀態
+      setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
     }
   };
 

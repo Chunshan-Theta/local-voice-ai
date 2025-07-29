@@ -10,8 +10,7 @@ import {
 } from '../lib/noiseCalibrator';
 import { 
   createTtsManager, 
-  type TtsManager, 
-  TTS_CONFIG 
+  type TtsManager
 } from '../lib/ttsManager';
 import { 
   createReplyManager, 
