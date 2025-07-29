@@ -227,6 +227,19 @@ class CustomCosyVoice:
                         '{}/flow.pt'.format(model_dir),
                         '{}/hift.pt'.format(model_dir))
         del configs
+        self.cached_prompt_embedding = None
+        self.cached_prompt_speech_token = None
+        self.cached_prompt_speech_token_len = None
+
+    def precompute_prompt_embeddings(self, prompt_speech_16k):
+        """Precompute and cache prompt embeddings and tokens for faster inference"""
+        self.cached_prompt_embedding = self.frontend._extract_spk_embedding(prompt_speech_16k)
+        self.cached_prompt_speech_token, self.cached_prompt_speech_token_len = self.frontend._extract_speech_token(prompt_speech_16k)
+        return {
+            'embedding': self.cached_prompt_embedding,
+            'speech_token': self.cached_prompt_speech_token,
+            'speech_token_len': self.cached_prompt_speech_token_len
+        }
 
     def list_avaliable_spks(self):
         spks = list(self.frontend.spk2info.keys())
@@ -275,6 +288,14 @@ class CustomCosyVoice:
                 continue
             print("Synthesizing:",i)
             model_input = self.frontend.frontend_zero_shot(i, prompt_text, prompt_speech_16k)
+            # Use cached embeddings if available
+            if self.cached_prompt_embedding is not None:
+                model_input['llm_embedding'] = self.cached_prompt_embedding
+                model_input['flow_embedding'] = self.cached_prompt_embedding
+                model_input['llm_prompt_speech_token'] = self.cached_prompt_speech_token
+                model_input['llm_prompt_speech_token_len'] = self.cached_prompt_speech_token_len
+                model_input['flow_prompt_speech_token'] = self.cached_prompt_speech_token
+                model_input['flow_prompt_speech_token_len'] = self.cached_prompt_speech_token_len
             model_output = self.model.inference(**model_input)
             tts_speeches.append(model_output['tts_speech'])
         return {'tts_speech': torch.concat(tts_speeches, dim=1)}

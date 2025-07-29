@@ -51,9 +51,14 @@ async def lifespan(app: FastAPI):
     app.state.prompt_speech_16k = load_wav(
         app.state.settings.speaker_prompt_audio_path, 16000
     )
+    # Precompute and cache prompt embeddings
+    print("Precomputing prompt embeddings...")
+    app.state.cached_prompt_data = app.state.cosyvoice.precompute_prompt_embeddings(app.state.prompt_speech_16k)
+    print("Prompt embeddings cached successfully")
     yield
     del app.state.cosyvoice
     del app.state.bopomofo_converter
+    del app.state.cached_prompt_data
 
 
 app = FastAPI(lifespan=lifespan, root_path="/v1")
