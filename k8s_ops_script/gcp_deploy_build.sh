@@ -17,11 +17,13 @@ gcloud auth configure-docker $REGION-docker.pkg.dev -q
 echo "🏗️ Building Docker images for AMD64 platform..."
 docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest ./app
 docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest ./whisper-service
+docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/breezyvoice:latest ./BreezyVoice
 # docker build --platform linux/amd64 -t $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local_ollama:latest ./local_ollama
 
 # 推送镜像到 Artifact Registry
 echo "⬆️ Pushing images to Artifact Registry..."
 docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local-voice-ai:latest
 docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/whisper-service:latest
+docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/breezyvoice:latest
 # docker push $REGION-docker.pkg.dev/$PROJECT_ID/local-voice-ai-repo/local_ollama:latest
 
