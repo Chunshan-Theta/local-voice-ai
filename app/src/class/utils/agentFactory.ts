@@ -1,5 +1,5 @@
 import { AgentConfig } from '../types';
-import { getDefaultAgentConfig } from '../config/defaultAgentConfigs';
+import { getDefaultAgentConfig } from '../config/';
 
 // Simple language type definition
 export type Language = 'zh' | 'en';
