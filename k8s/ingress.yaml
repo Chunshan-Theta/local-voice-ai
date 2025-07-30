@@ -67,7 +67,6 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: "gce"
     kubernetes.io/ingress.allow-http: "true"
-    cloud.google.com/health-check-path: "/models"
 spec:
   rules:
     - http:
