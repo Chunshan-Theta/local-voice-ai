@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: model-svr-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    depends_on:
+      - breezy-voice
+      - ollama-service
+      - whisper-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # BreezyVoice TTS Service
+  breezy-voice:
+    build:
+      context: ./BreezyVoice
+      dockerfile: Dockerfile
+    container_name: model-svr-breezy-voice
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6
+      - OMP_NUM_THREADS=1
+      - CUDA_LAUNCH_BLOCKING=0
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - hf-cache:/root/.cache/huggingface/
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    init: true
+    command: ["python", "api.py"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Ollama LLM Service
+  ollama-service:
+    image: ollama/ollama:latest
+    container_name: model-svr-ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/ollama/models
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ollama-storage:/ollama
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      bash -c "
+        ollama serve &
+        sleep 15 &&
+        ollama pull gemma2:2b &&
+        wait
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Whisper Speech-to-Text Service
+  whisper-service:
+    build:
+      context: ./whisper-service
+      dockerfile: Dockerfile
+    container_name: model-svr-whisper
+    environment:
+      - HF_HOME=/cache
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - WHISPER_MODEL=medium
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    volumes:
+      - hf-cache:/cache
+      - ./whisper-service/tmp:/app/tmp
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  model-svr-network:
+    driver: bridge
+
+volumes:
+  # Persistent volume for Hugging Face cache (shared by BreezyVoice and Whisper)
+  hf-cache:
+    driver: local
+
+  # Persistent volume for Ollama models
+  ollama-storage:
+    driver: local
