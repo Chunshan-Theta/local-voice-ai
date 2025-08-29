@@ -80,7 +80,7 @@ services:
       bash -c "
         ollama serve &
         sleep 15 &&
-        ollama pull gemma2:2b &&
+        ollama pull gemma3:12b &&
         wait
       "
     healthcheck:
@@ -94,7 +94,7 @@ services:
   whisper-service:
     build:
       context: ./whisper-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.amd
     container_name: model-svr-whisper
     environment:
       - HF_HOME=/cache

@@ -1,0 +1,99 @@
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: model-svr-nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    depends_on:
+      - ollama-service
+      - whisper-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Ollama LLM Service
+  ollama-service:
+    image: ollama/ollama:rocm
+    container_name: model-svr-ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/ollama/models
+      - HSA_OVERRIDE_GFX_VERSION=12.0.1
+      - HIP_VISIBLE_DEVICES=0
+    
+    volumes:
+      - ollama-storage:/ollama
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri
+
+  # Whisper Speech-to-Text Service
+  whisper-service:
+    build:
+      context: ./whisper-service
+      dockerfile: Dockerfile.amd
+    container_name: model-svr-whisper
+    environment:
+      - HF_HOME=/cache
+      - HIP_VISIBLE_DEVICES=1
+      - HSA_OVERRIDE_GFX_VERSION=12.0.1
+      - WHISPER_MODEL=medium
+      - PYTORCH_HIP_ALLOC_CONF=max_split_size_mb:512
+      - ROC_ENABLE_PRE_VEGA=1
+      - GPU_DEVICE_ORDINAL=1
+      - CUDA_VISIBLE_DEVICES=1
+    volumes:
+      - hf-cache:/cache
+      - ./whisper-service/tmp:/app/tmp
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+      - /sys/class/kfd:/sys/class/kfd:ro
+      - /sys/devices:/sys/devices:ro
+    networks:
+      - model-svr-network
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri/card1
+      - /dev/dri/card2
+      - /dev/dri/renderD128
+      - /dev/dri/renderD129
+    group_add:
+      - "44"    # video group
+      - "992"   # render group
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  model-svr-network:
+    driver: bridge
+
+volumes:
+  # Persistent volume for Hugging Face cache (shared by BreezyVoice and Whisper)
+  hf-cache:
+    driver: local
+
+  # Persistent volume for Ollama models
+  ollama-storage:
+    driver: local

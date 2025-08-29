@@ -1,5 +1,5 @@
-# Use ROCm PyTorch image as base for AMD GPU support
-FROM rocm/pytorch:rocm5.7_ubuntu20.04_py3.9_pytorch_2.0.1
+# Use newer ROCm PyTorch image for better compatibility
+FROM rocm/pytorch
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
     curl \
+    rocm-dev \
+    rocm-libs \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
@@ -24,28 +26,29 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install PyTorch with ROCm support and other dependencies
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY app.py .
 
 # Set ROCm environment variables for optimal GPU performance
-ENV ROC_VISIBLE_DEVICES=0
-ENV HSA_OVERRIDE_GFX_VERSION=10.3.0
-ENV PYTORCH_ROCM_ARCH=gfx1030
+# Note: ROC_VISIBLE_DEVICES will be overridden by docker-compose HIP_VISIBLE_DEVICES
+ENV HSA_OVERRIDE_GFX_VERSION=12.0.1
+ENV PYTORCH_ROCM_ARCH=gfx1201
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/tmp && chmod 755 /app/tmp
 RUN mkdir -p /root/.cache/whisper
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app && \
-    chown -R app:app /root/.cache
+# Note: Running as root temporarily for GPU access troubleshooting
+# Create non-root user for security (commented out for now)
+# RUN useradd --create-home --shell /bin/bash app && \
+#     chown -R app:app /app && \
+#     chown -R app:app /root/.cache
 
-# Switch to non-root user
-USER app
+# Switch to non-root user (commented out for now)
+# USER app
 
 # Expose port
 EXPOSE 5001
