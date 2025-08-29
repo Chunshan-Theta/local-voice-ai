@@ -7,23 +7,18 @@ services:
       context: ./app
       dockerfile: Dockerfile
     container_name: local-voice-ai-frontend
-    ports:
-      - "3000:3000"
+    network_mode: host
     environment:
       - NODE_ENV=production
-      - OLLAMA_BASE_URL=http://ollama-service:11434
-      - OLLAMA_MODEL=gemma3:1b
-      - WHISPER_SERVICE_URL=http://whisper-service:5001
-      - WHISPER_MODEL=tiny
-    networks:
-      - voice-ai-network
+      - OLLAMA_BASE_URL=http://localhost:8000/llm
+      - OLLAMA_MODEL=gemma3:12b
+      - WHISPER_SERVICE_URL=http://localhost:8000/stt
+      - TTS_SERVICE_URL=http://localhost:8000/tts
+      - TTS_API_KEY=${TTS_API_KEY}
     volumes:
       - ./app/tmp:/app/tmp
     restart: unless-stopped
 
-networks:
-  voice-ai-network:
-    driver: bridge
 
 volumes:
   # Persistent volume for Hugging Face cache (Whisper models)

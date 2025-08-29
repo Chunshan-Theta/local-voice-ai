@@ -18,7 +18,7 @@ COPY lib ./lib
 COPY src ./src
 COPY *.json ./
 COPY *.js ./
-COPY *.ts ./
+# COPY *.ts ./
 
 # Build the application
 RUN npm run build

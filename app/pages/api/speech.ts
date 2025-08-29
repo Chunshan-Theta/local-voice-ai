@@ -27,10 +27,12 @@ export default async function handler(
     console.log(`🎯 正在調用 TTS 服務: ${ttsServiceUrl}`);
     console.log(`📝 輸入文本: ${processedInput.substring(0, 50)}${processedInput.length > 50 ? '...' : ''}`);
 
-    const response = await fetch(`${ttsServiceUrl}/audio/speech`, {
+    const ttsApiKey = process.env.TTS_API_KEY || '';
+    const response = await fetch(`${ttsServiceUrl}/v1/audio/speech`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${ttsApiKey}`
       },
       body: JSON.stringify({ input: processedInput }),
     }).catch(error => {
