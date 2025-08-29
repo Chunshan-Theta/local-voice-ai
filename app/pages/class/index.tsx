@@ -383,7 +383,7 @@ function ClassChatPage() {
             console.log('📋 最終確認 agentConfig 已設置:', agentConfig.name);
             
             // 模擬用戶說了 "hi"，傳遞當前的空消息數組
-            await replyManagerRef.current.processTextMessage('hi', []);
+            await replyManagerRef.current.processTextMessage('聽說你最近有和隔壁部門在開會時吵架嗎？', []);
             console.log('✅ 破冰消息處理完成');
           } else {
             console.error('❌ replyManager 或 processTextMessage 方法不可用');

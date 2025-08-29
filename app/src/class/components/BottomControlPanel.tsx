@@ -197,7 +197,7 @@ const BottomControlPanel: React.FC<BottomControlPanelProps> = ({
       )}
 
       {/* 重新開始按鈕 */}
-      {!conversationStarted && showReportButton && (
+      {!conversationStarted && showReportButton && false && (
         <button
           onClick={onStartNewConversation}
           style={{

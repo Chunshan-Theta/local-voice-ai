@@ -11,7 +11,7 @@ services:
     environment:
       - NODE_ENV=production
       - OLLAMA_BASE_URL=http://localhost:8000/llm
-      - OLLAMA_MODEL=gemma3:12b
+      - OLLAMA_MODEL=gemma3:4b
       - WHISPER_SERVICE_URL=http://localhost:8000/stt
       - TTS_SERVICE_URL=http://localhost:8000/tts
       - TTS_API_KEY=${TTS_API_KEY}
