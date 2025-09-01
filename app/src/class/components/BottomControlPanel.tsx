@@ -162,7 +162,7 @@ const BottomControlPanel: React.FC<BottomControlPanelProps> = ({
       </div>
 
       {/* 結束並開始分析按鈕 */}
-      {conversationStarted && messagesLength > 0 && (
+      {conversationStarted && false && messagesLength > 0 && (
         <button
           onClick={handleEndAndAnalyze}
           disabled={generatingReport}

@@ -1142,18 +1142,7 @@ export default function Home() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
-        <p>✅ 智慧環境音校準，可靠的音量檢測</p>
-        <p>✅ 使用 Whisper Small 模型進行中文語音辨識</p>
-        <p>✅ 連接到 Gemma3:1b 模型生成回覆</p>
-        <p>🗣️ 使用瀏覽器原生 Web Speech API 進行語音合成</p>
-        <p>🔄 AI 回應後等待語音觸發，檢測到超過閾值的音量時自動開始錄音</p>
-        <p>🧠 智慧對話記憶：AI 會記住最近的對話內容，讓交談更自然</p>
-        <p>🎭 真人化回應：使用專門的提示詞讓 AI 回答更像真人對話</p>
-        <p>📊 持續音量監測：永遠監測環境音量，即使未開始對話也能看到音量變化</p>
-        <p>🚨 智慧打斷功能：TTS 播放時若檢測到搶話閾值，會自動停止播放並開始錄音</p>
-      </div>
-
+      
       <style jsx>{`
         @keyframes pulse {
           0% { transform: scale(1); }
