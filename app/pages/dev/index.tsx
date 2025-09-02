@@ -1,24 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import type { ConversationMessage } from '../lib/ollama';
+import type { ConversationMessage } from '../../lib/ollama';
 import { 
   createNoiseCalibrator, 
   createThresholdCalculator, 
   type NoiseCalibrator, 
   type ThresholdCalculator,
   NOISE_CALIBRATION_CONFIG 
-} from '../lib/noiseCalibrator';
+} from '../../lib/noiseCalibrator';
 import { 
   createTtsManager, 
   type TtsManager
-} from '../lib/ttsManager';
+} from '../../lib/ttsManager';
 import { 
   createReplyManager, 
   type ReplyManager, 
   type Message,
   formatReplyError,
   isAudioValid
-} from '../lib/replyManager';
+} from '../../lib/replyManager';
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false);
@@ -833,25 +833,6 @@ export default function Home() {
       padding: '1rem'
     }}>
       <h1>本地語音 AI 助手 🧠</h1>
-      
-      {/* 導航連結 */}
-      <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-        <a 
-          href="/voice-setup" 
-          style={{ 
-            color: '#007bff', 
-            textDecoration: 'none',
-            fontSize: '0.9rem',
-            padding: '0.5rem 1rem',
-            border: '1px solid #007bff',
-            borderRadius: '4px',
-            backgroundColor: 'white'
-          }}
-        >
-          🎙️ 聲音設定
-        </a>
-      </div>
-      
       <p style={{ color: '#666', marginBottom: '1rem' }}>
         智慧對話記憶 + 真人化回應。自動校準環境音，智慧檢測語音活動。AI 會記住對話內容，回應後自動重新開始錄音。
       </p>
