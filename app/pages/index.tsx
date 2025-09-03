@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import axios from 'axios';
 import type { ConversationMessage } from '../lib/ollama';
 import { 
@@ -21,6 +22,9 @@ import {
 } from '../lib/replyManager';
 
 export default function Home() {
+  const router = useRouter();
+  
+  // 簡化的狀態管理 - 移除自動檢測相關狀態
   const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,46 +35,24 @@ export default function Home() {
   const [ttsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   
-  // 音頻檢測相關狀態
-  const [isCalibrating, setIsCalibrating] = useState(false);
+  // 音量監控狀態（僅用於顯示）
   const [currentVolume, setCurrentVolume] = useState<number>(0);
-  const [calibrationProgress, setCalibrationProgress] = useState<number>(0);
-  const [hasDetectedVoice, setHasDetectedVoice] = useState(false);
-  const [waitingForVoiceAfterTts, setWaitingForVoiceAfterTts] = useState(false);
   
-  // 打斷相關狀態
-  const [isInterrupting, setIsInterrupting] = useState(false);
-  
-  // 簡化的refs管理
+  // 簡化的 refs 管理 - 移除自動檢測相關的 refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const volumeCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const continuousVolumeCheckRef = useRef<NodeJS.Timeout | null>(null); // 新增：持續音量監測
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const noiseCalibrationRef = useRef<NoiseCalibrator | null>(null);
-  const thresholdCalculatorRef = useRef<ThresholdCalculator | null>(null);
   const ttsManagerRef = useRef<TtsManager | null>(null);
   const replyManagerRef = useRef<ReplyManager | null>(null);
+  const volumeCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 簡化的refs
+  // 簡化的 refs
   const isListeningRef = useRef(false);
-  const hasDetectedVoiceRef = useRef(false);
-  const waitingForVoiceAfterTtsRef = useRef(false);
   const conversationStartedRef = useRef(false);
-  const baselineNoiseRef = useRef(10);
-  const recordingStartTimeRef = useRef<number>(0); // 記錄開始錄音的時間
+  const recordingStartTimeRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // 打斷相關 refs
-  const isInterruptingRef = useRef(false);
-  const interruptCheckCountRef = useRef(0); // 用於連續檢測計數
-
-  // 常數
-  const SILENCE_DURATION = 2000; // 2秒靜音後自動發送
-  const MIN_RECORDING_DURATION = 1000; // 最小錄音時間：1秒
 
   // 簡化TTS管理器初始化
   useEffect(() => {
@@ -86,19 +68,6 @@ export default function Home() {
         {
           onStart: (text, messageId) => {
             console.log('🔇 TTS開始播放');
-            // 停止當前錄音（如果有的話）
-            if (isListeningRef.current) {
-              console.log('⏹️ TTS開始時停止錄音');
-              stopListening();
-            }
-            
-            // TTS開始時清除等待狀態
-            if (waitingForVoiceAfterTtsRef.current) {
-              console.log('🔄 TTS開始時清除等待語音觸發狀態');
-              setWaitingForVoiceAfterTts(false);
-              waitingForVoiceAfterTtsRef.current = false;
-            }
-            
             if (messageId) {
               setMessages(prev => prev.map(msg => 
                 msg.id === messageId ? { ...msg, isPlaying: true } : { ...msg, isPlaying: false }
@@ -108,40 +77,10 @@ export default function Home() {
           onEnd: (messageId) => {
             console.log('✅ TTS播放完成');
             setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
-            
-            // TTS結束後等待語音輸入
-            setTimeout(() => {
-              console.log('🎤 TTS結束後等待語音輸入');
-              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, isListeningRef=${isListeningRef.current}`);
-              if (conversationStartedRef.current && !isListeningRef.current) {
-                console.log('✅ 條件滿足，設置等待語音觸發狀態');
-                setWaitingForVoiceAfterTts(true);
-                waitingForVoiceAfterTtsRef.current = true;
-              } else {
-                console.log('❌ 條件不滿足，無法設置等待語音觸發狀態');
-                console.log(`  - conversationStarted: ${conversationStartedRef.current}`);
-                console.log(`  - isListening: ${isListeningRef.current}`);
-              }
-            }, 500);
           },
           onError: (error, messageId) => {
             console.error('❌ TTS 錯誤:', error.error);
             setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
-            
-            // TTS錯誤後也要等待語音輸入
-            setTimeout(() => {
-              console.log('🎤 TTS錯誤後等待語音輸入');
-              console.log(`條件檢查: conversationStarted=${conversationStartedRef.current}, isListeningRef=${isListeningRef.current}`);
-              if (conversationStartedRef.current && !isListeningRef.current) {
-                console.log('✅ 條件滿足，設置等待語音觸發狀態');
-                setWaitingForVoiceAfterTts(true);
-                waitingForVoiceAfterTtsRef.current = true;
-              } else {
-                console.log('❌ 條件不滿足，無法設置等待語音觸發狀態');
-                console.log(`  - conversationStarted: ${conversationStartedRef.current}`);
-                console.log(`  - isListening: ${isListeningRef.current}`);
-              }
-            }, 500);
           },
           onSpeakingChange: (speaking) => {
             setIsSpeaking(speaking);
@@ -157,8 +96,6 @@ export default function Home() {
       if (replyManagerRef.current) {
         replyManagerRef.current.destroy();
       }
-      // 組件卸載時才停止持續監測
-      stopContinuousVolumeMonitoring();
       
       // 清理音頻資源
       if (audioStreamRef.current) {
@@ -237,16 +174,11 @@ export default function Home() {
               }, 2000);
             }
             
-            // 語音轉錄錯誤後，如果對話已開始，重新進入等待語音觸發狀態
+            // 語音轉錄錯誤後不需要特殊處理，用戶可以再次點擊錄音
             setTimeout(() => {
-              if (conversationStartedRef.current && !isListeningRef.current) {
-                console.log('🔄 語音轉錄錯誤後，重新進入等待語音觸發狀態');
-                setWaitingForVoiceAfterTts(true);
-                waitingForVoiceAfterTtsRef.current = true;
-                // 清除錯誤信息，避免一直顯示
-                setError(null);
-              }
-            }, 2000); // 2秒後清除錯誤並重新進入等待狀態
+              // 清除錯誤信息
+              setError(null);
+            }, 3000); // 3秒後清除錯誤
           },
           onSpeakReply: (text, messageId) => {
             if (ttsEnabled && text.trim()) {
@@ -266,127 +198,14 @@ export default function Home() {
     };
   }, [ttsEnabled]);
 
-  // 初始化並啟動持續音量監測
+  // 初始化音頻流用於音量監控
   useEffect(() => {
-    if (!noiseCalibrationRef.current) {
-      noiseCalibrationRef.current = createNoiseCalibrator({
-        calibrationDuration: NOISE_CALIBRATION_CONFIG.DEFAULT_CALIBRATION_DURATION,
-        minBaselineNoise: NOISE_CALIBRATION_CONFIG.DEFAULT_MIN_BASELINE_NOISE,
-        samplingInterval: NOISE_CALIBRATION_CONFIG.DEFAULT_SAMPLING_INTERVAL,
-        onProgress: (progress, currentVolume) => {
-          setCalibrationProgress(progress);
-          setCurrentVolume(currentVolume);
-        },
-        onComplete: (baselineNoise) => {
-          baselineNoiseRef.current = baselineNoise;
-          setIsCalibrating(false);
-          
-          if (!thresholdCalculatorRef.current) {
-            thresholdCalculatorRef.current = createThresholdCalculator(baselineNoise);
-          } else {
-            thresholdCalculatorRef.current.updateBaselineNoise(baselineNoise);
-          }
-          
-          // 校準完成後自動開始持續音量監測
-          startContinuousVolumeMonitoring();
-        },
-        onError: (error) => {
-          console.error('校準錯誤:', error);
-          setError('校準失敗，將使用預設值');
-          setIsCalibrating(false);
-          // 即使校準失敗也要開始音量監測
-          startContinuousVolumeMonitoring();
-        }
-      });
-    }
-
-    if (!thresholdCalculatorRef.current) {
-      thresholdCalculatorRef.current = createThresholdCalculator(baselineNoiseRef.current);
-    }
-
-    // 組件初始化時就開始持續音量監測
-    const initializeContinuousMonitoring = async () => {
-      try {
-        await createAudioStream();
-        startContinuousVolumeMonitoring();
-      } catch (error) {
-        console.log('等待用戶交互後再啟動音量監測');
-      }
-    };
+    startVolumeMonitoring();
     
-    initializeContinuousMonitoring();
-
-    // 清理函數
     return () => {
-      stopContinuousVolumeMonitoring();
+      stopVolumeMonitoring();
     };
   }, []);
-
-  // 計算動態閾值 - 使用閾值計算器
-  const getSilenceThreshold = () => {
-    if (thresholdCalculatorRef.current) {
-      return thresholdCalculatorRef.current.getSilenceThreshold();
-    }
-    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.SILENCE_THRESHOLD_OFFSET; // 降級處理
-  };
-  
-  const getVoiceThreshold = () => {
-    if (thresholdCalculatorRef.current) {
-      const isTtsPlaying = ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : false;
-      return thresholdCalculatorRef.current.getCurrentVoiceThreshold(isTtsPlaying);
-    }
-    
-    // 簡化的降級處理邏輯
-    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.VOICE_THRESHOLD_OFFSET;
-  };
-
-  // 獲取搶話閾值
-  const getInterruptThreshold = () => {
-    if (thresholdCalculatorRef.current) {
-      return thresholdCalculatorRef.current.getInterruptThreshold();
-    }
-    return baselineNoiseRef.current + NOISE_CALIBRATION_CONFIG.INTERRUPT_THRESHOLD_OFFSET;
-  };
-
-  // 檢查是否應該打斷 TTS
-  const shouldInterruptTts = (currentVolume: number): boolean => {
-    const isTtsPlaying = ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : false;
-    if (!isTtsPlaying || isInterruptingRef.current || isListeningRef.current) {
-      return false;
-    }
-    
-    if (thresholdCalculatorRef.current) {
-      return thresholdCalculatorRef.current.shouldInterrupt(currentVolume, isTtsPlaying);
-    }
-    
-    // 降級處理：手動實現打斷邏輯
-    const baseThreshold = getVoiceThreshold();
-    const interruptThreshold = getInterruptThreshold();
-    return currentVolume >= baseThreshold && currentVolume >= interruptThreshold;
-  };
-
-  // 執行打斷 TTS 的動作
-  const performTtsInterrupt = () => {
-    console.log('🚨 檢測到搶話，打斷 TTS 播放');
-    setIsInterrupting(true);
-    isInterruptingRef.current = true;
-    
-    // 停止 TTS 播放
-    if (ttsManagerRef.current) {
-      ttsManagerRef.current.stop();
-    }
-    
-    // 重置打斷檢測計數
-    interruptCheckCountRef.current = 0;
-    
-    // 立即開始錄音
-    setTimeout(() => {
-      console.log('🎤 打斷後開始錄音');
-      setIsInterrupting(false);
-      isInterruptingRef.current = false;
-      startListening();
-    }, 100);
-  };
 
   // 自動滾動到最新消息
   useEffect(() => {
@@ -407,7 +226,7 @@ export default function Home() {
     setMessages(prev => prev.map(msg => ({ ...msg, isPlaying: false })));
   };
 
-  // 簡化音頻流創建
+  // 創建音頻流
   const createAudioStream = async () => {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
@@ -427,7 +246,7 @@ export default function Home() {
     return stream;
   };
 
-  // 簡化音頻分析器設置
+  // 設置音頻分析器用於音量監控
   const setupAudioAnalyser = (stream: MediaStream) => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       audioContextRef.current = new AudioContext();
@@ -445,66 +264,61 @@ export default function Home() {
     return analyserRef.current;
   };
 
-  // 簡化環境音校準
-  const calibrateEnvironmentalNoise = async () => {
+  // 開始音量監控（僅用於顯示）
+  const startVolumeMonitoring = async () => {
     try {
-      setIsCalibrating(true);
-      setCalibrationProgress(0);
-      stopSpeaking();
-      
-      // 使用現有的音頻流或創建新的
       let stream = audioStreamRef.current;
-      if (!stream || !stream.active) {
-        stream = await createAudioStream();
-      }
-      
-      const analyser = setupAudioAnalyser(stream);
-
-      if (noiseCalibrationRef.current) {
-        await noiseCalibrationRef.current.startCalibration(analyser);
-      } else {
-        throw new Error('噪音校準器未初始化');
-      }
-      
-    } catch (err) {
-      console.error('校準錯誤:', err);
-      setError('校準失敗，將使用預設值');
-      setIsCalibrating(false);
-      // 即使校準失敗也要確保持續監測正在運行
-      if (!continuousVolumeCheckRef.current) {
-        startContinuousVolumeMonitoring();
-      }
-    }
-  };
-
-  const startListening = async () => {
-    try {
-      // 開始錄音時停止TTS播放
-      if (isSpeaking) {
-        stopSpeaking();
-      }
-      
-      // 開始錄音時清除等待狀態
-      setWaitingForVoiceAfterTts(false);
-      waitingForVoiceAfterTtsRef.current = false;
-      
-      // 如果已經在錄音，先停止
-      if (isListeningRef.current) {
-        stopListening();
-      }
-      
-      setError(null);
-      audioChunksRef.current = [];
-      setHasDetectedVoice(false);
-      hasDetectedVoiceRef.current = false;
-      
-      // 創建或使用現有音頻流
-      let stream = audioStreamRef.current;
-      
       if (!stream || !stream.active) {
         stream = await createAudioStream();
         setupAudioAnalyser(stream);
-      } else if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      }
+
+      if (volumeCheckIntervalRef.current) {
+        clearInterval(volumeCheckIntervalRef.current);
+      }
+
+      volumeCheckIntervalRef.current = setInterval(() => {
+        if (!analyserRef.current) return;
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        setCurrentVolume(average);
+      }, 100);
+      
+    } catch (error) {
+      console.error('啟動音量監測失敗:', error);
+    }
+  };
+
+  const stopVolumeMonitoring = () => {
+    if (volumeCheckIntervalRef.current) {
+      clearInterval(volumeCheckIntervalRef.current);
+      volumeCheckIntervalRef.current = null;
+    }
+  };
+
+  // 手動控制錄音 - 點擊開始，再次點擊結束
+  const toggleRecording = async () => {
+    if (isListening) {
+      // 結束錄音
+      await stopRecording();
+    } else {
+      // 開始錄音
+      await startRecording();
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      setError(null);
+      audioChunksRef.current = [];
+      
+      // 創建或使用現有音頻流
+      let stream = audioStreamRef.current;
+      if (!stream || !stream.active) {
+        stream = await createAudioStream();
         setupAudioAnalyser(stream);
       }
 
@@ -530,13 +344,9 @@ export default function Home() {
       mediaRecorder.start(100);
       setIsListening(true);
       isListeningRef.current = true;
-      recordingStartTimeRef.current = Date.now(); // 記錄開始錄音的時間
+      recordingStartTimeRef.current = Date.now();
       
-      // startListening 時不自動設置 conversationStarted
-      // 這應該由 startConversation 或其他明確的流程控制
-      console.log(`🎤 startListening: conversationStarted=${conversationStartedRef.current}`);
-      
-      // 持續音量監測應該已經在運行，不需要重複啟動
+      console.log('🎤 開始錄音');
       
     } catch (err) {
       console.error('錄音錯誤:', err);
@@ -544,57 +354,33 @@ export default function Home() {
     }
   };
 
-  const stopListening = () => {
+  const stopRecording = async () => {
+    console.log('⏹️ 停止錄音');
     setIsListening(false);
     isListeningRef.current = false;
-    setCurrentVolume(0);
-    setHasDetectedVoice(false);
-    hasDetectedVoiceRef.current = false;
     
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-  };
-
-  const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
-    stopListening();
+  };
+
+  const startConversation = () => {
+    console.log('✅ 開始對話');
+    setConversationStarted(true);
+    conversationStartedRef.current = true;
   };
 
   const endConversation = () => {
-    console.log('🛑 結束對話 - 設置 conversationStarted = false');
+    console.log('🛑 結束對話');
     setConversationStarted(false);
     conversationStartedRef.current = false;
-    stopRecording();
-    stopVolumeMonitoring(); // 只停止錄音相關的監測
+    
+    if (isListening) {
+      stopRecording();
+    }
     stopSpeaking();
     setMessages([]);
-    
-    // 清除等待狀態
-    setWaitingForVoiceAfterTts(false);
-    waitingForVoiceAfterTtsRef.current = false;
-    
-    // 不關閉音頻流和分析器，保持持續監測
-    // 只重置語音檢測狀態
-    setHasDetectedVoice(false);
-    hasDetectedVoiceRef.current = false;
-  };
-
-  const startConversation = async () => {
-    await calibrateEnvironmentalNoise();
-    setTimeout(() => {
-      // 持續音量監測應該已經在運行
-      // 第一次對話也設置為等待語音觸發模式
-      console.log('🎤 校準完成，進入等待語音觸發模式');
-      console.log('✅ 設置 conversationStarted = true');
-      setConversationStarted(true);
-      conversationStartedRef.current = true;
-      setWaitingForVoiceAfterTts(true);
-      waitingForVoiceAfterTtsRef.current = true;
-    }, 500);
+    setError(null);
   };
 
   const processAudio = async () => {
@@ -608,22 +394,11 @@ export default function Home() {
       const recordingDuration = Date.now() - recordingStartTimeRef.current;
       console.log(`🎤 錄音時長: ${recordingDuration}ms`);
       
-      // 如果錄音時間小於最小時長，視為誤判
-      if (recordingDuration < MIN_RECORDING_DURATION) {
-        console.log(`⚠️ 錄音時間過短 (<${MIN_RECORDING_DURATION}ms)，視為誤判，重新進入等待語音觸發狀態`);
+      // 最小錄音時長檢查
+      if (recordingDuration < 500) {
+        console.log(`⚠️ 錄音時間過短 (<500ms)，請說話時間長一點`);
         setError('錄音時間過短，請說話時間長一點');
         setLoading(false);
-        
-        // 重新進入等待語音觸發狀態
-        if (conversationStartedRef.current) {
-          setTimeout(() => {
-            console.log('🔄 短錄音後重新進入等待語音觸發狀態');
-            setWaitingForVoiceAfterTts(true);
-            waitingForVoiceAfterTtsRef.current = true;
-            // 清除錯誤提示
-            setError(null);
-          }, 2000); // 2秒後清除錯誤並重新進入等待狀態
-        }
         return;
       }
       
@@ -641,179 +416,20 @@ export default function Home() {
 
     } catch (err) {
       console.error('處理錯誤:', err);
-      // 錯誤處理已在replyManager的callback中處理，這裡不需要重複處理
-      // 但如果是網絡錯誤等其他錯誤，也要確保能重新進入等待狀態
     } finally {
       setLoading(false);
-      
-      // 音頻處理完成後，如果對話已開始且沒有在錄音，準備等待TTS完成或重新等待語音觸發
-      if (conversationStartedRef.current && !isListeningRef.current) {
-        console.log('🎤 音頻處理完成，準備等待TTS播放和語音觸發');
-        // 如果沒有錯誤，等待狀態將由TTS的onEnd回調設置
-        // 如果有錯誤，等待狀態將由replyManager的onError回調設置
-      }
     }
   };
 
   const getVolumeBarColor = () => {
-    if (isCalibrating) return '#ffc107';
-    if (isInterrupting) return '#e91e63'; // 粉紅色 - 打斷中
-    if (!isListening && !waitingForVoiceAfterTts) return '#6c757d';
-    
-    const voiceThreshold = getVoiceThreshold();
-    const silenceThreshold = getSilenceThreshold();
-    const interruptThreshold = getInterruptThreshold();
-    
-    // TTS 播放時的特殊顏色
-    if (ttsManagerRef.current && ttsManagerRef.current.isSpeaking()) {
-      if (currentVolume >= interruptThreshold) return '#ff5722'; // 深橙色 - 觸發搶話閾值
-      if (currentVolume >= voiceThreshold) return '#ff9800'; // 橙色 - 接近搶話閾值
-      return '#9c27b0'; // 紫色 - TTS 播放中
-    }
-    
-    if (currentVolume >= voiceThreshold) return '#28a745'; // 綠色 - 語音
-    if (currentVolume >= silenceThreshold) return '#fd7e14'; // 橙色 - 中等
-    return '#dc3545'; // 紅色 - 靜音
+    if (isListening) return '#28a745'; // 綠色 - 錄音中
+    if (isSpeaking) return '#9c27b0'; // 紫色 - TTS 播放中
+    return '#6c757d'; // 灰色 - 待機
   };
 
   const getVolumePercentage = () => {
-    const maxDisplayVolume = Math.max(getVoiceThreshold() * 2, 100);
+    const maxDisplayVolume = 100;
     return Math.min((currentVolume / maxDisplayVolume) * 100, 100);
-  };
-
-  // 持續音量監測 - 獨立於錄音狀態
-  const startContinuousVolumeMonitoring = async () => {
-    try {
-      // 如果已經在監測，先停止
-      if (continuousVolumeCheckRef.current) {
-        clearInterval(continuousVolumeCheckRef.current);
-      }
-
-      // 確保有音頻流和分析器
-      let stream = audioStreamRef.current;
-      if (!stream || !stream.active) {
-        stream = await createAudioStream();
-        setupAudioAnalyser(stream);
-      } else if (!analyserRef.current) {
-        setupAudioAnalyser(stream);
-      }
-
-      continuousVolumeCheckRef.current = setInterval(() => {
-        if (!analyserRef.current) return;
-
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(dataArray);
-        
-        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        setCurrentVolume(average);
-        
-        // 詳細的狀態調試信息（每5秒輸出一次）
-        // if (Math.round(Date.now() / 1000) % 5 === 0) {
-        //   console.log(`📊 狀態檢查: 
-        //     - waitingForVoiceAfterTts: ${waitingForVoiceAfterTtsRef.current}
-        //     - isListening: ${isListeningRef.current} 
-        //     - isSpeaking: ${ttsManagerRef.current ? ttsManagerRef.current.isSpeaking() : 'unknown'}
-        //     - isInterrupting: ${isInterruptingRef.current}
-        //     - 當前音量: ${average.toFixed(1)}
-        //     - 語音閾值: ${getVoiceThreshold().toFixed(1)}
-        //     - 搶話閾值: ${getInterruptThreshold().toFixed(1)}`);
-        // }
-        
-        // 打斷邏輯：TTS 播放時檢測搶話
-        if (ttsManagerRef.current && ttsManagerRef.current.isSpeaking() && 
-            !isListeningRef.current && !isInterruptingRef.current) {
-          
-          if (shouldInterruptTts(average)) {
-            interruptCheckCountRef.current++;
-            console.log(`🔍 檢測到可能的搶話 (${interruptCheckCountRef.current}/3): 音量=${average.toFixed(1)}, 搶話閾值=${getInterruptThreshold().toFixed(1)}`);
-            
-            // 連續3次檢測到搶話才執行打斷（避免誤判）
-            if (interruptCheckCountRef.current >= 3) {
-              performTtsInterrupt();
-              return; // 執行打斷後直接返回，不繼續其他邏輯
-            }
-          } else {
-            // 重置計數器
-            if (interruptCheckCountRef.current > 0) {
-              interruptCheckCountRef.current = 0;
-            }
-          }
-        }
-        
-        // 如果正在錄音，同時進行語音檢測邏輯
-        if (isListeningRef.current) {
-          const voiceThreshold = getVoiceThreshold();
-          const isVoiceDetected = average >= voiceThreshold;
-          
-          if (isVoiceDetected) {
-            if (!hasDetectedVoiceRef.current) {
-              setHasDetectedVoice(true);
-              hasDetectedVoiceRef.current = true;
-            }
-            
-            if (silenceTimerRef.current) {
-              clearTimeout(silenceTimerRef.current);
-              silenceTimerRef.current = null;
-            }
-          } else if (hasDetectedVoiceRef.current) {
-            if (!silenceTimerRef.current) {
-              silenceTimerRef.current = setTimeout(() => {
-                silenceTimerRef.current = null;
-                stopRecording();
-              }, SILENCE_DURATION);
-            }
-          }
-        }
-        
-        // 如果正在等待TTS後的語音輸入，檢測是否超過閾值
-        if (waitingForVoiceAfterTtsRef.current && !isListeningRef.current) {
-          const voiceThreshold = getVoiceThreshold();
-          // 減少日志輸出頻率，只在檢測到語音或每隔幾秒輸出一次
-          const shouldLog = average >= voiceThreshold || (Math.round(Date.now() / 1000) % 3 === 0);
-          if (shouldLog) {
-            console.log(`🔍 等待語音檢測中... 當前音量: ${average.toFixed(1)}, 閾值: ${voiceThreshold.toFixed(1)}`);
-          }
-          
-          if (average >= voiceThreshold) {
-            console.log('🎤 檢測到語音，自動開始錄音');
-            setWaitingForVoiceAfterTts(false);
-            waitingForVoiceAfterTtsRef.current = false;
-            // 使用 setTimeout 避免在當前函數執行中調用 startListening
-            setTimeout(() => {
-              startListening();
-            }, 50);
-          }
-        }
-      }, 100);
-      
-      console.log('✅ 持續音量監測已啟動');
-    } catch (error) {
-      console.error('啟動持續音量監測失敗:', error);
-    }
-  };
-
-  const stopContinuousVolumeMonitoring = () => {
-    if (continuousVolumeCheckRef.current) {
-      clearInterval(continuousVolumeCheckRef.current);
-      continuousVolumeCheckRef.current = null;
-      console.log('❌ 持續音量監測已停止');
-    }
-  };
-
-  // 簡化的音量檢測循環（保留用於向後兼容）
-  const startVolumeMonitoring = () => {
-    // 現在直接使用持續監測
-    if (!continuousVolumeCheckRef.current) {
-      startContinuousVolumeMonitoring();
-    }
-  };
-
-  const stopVolumeMonitoring = () => {
-    // 不再停止持續監測，只清理錄音相關的定時器
-    if (volumeCheckIntervalRef.current) {
-      clearInterval(volumeCheckIntervalRef.current);
-      volumeCheckIntervalRef.current = null;
-    }
   };
 
   const formatTime = (date: Date) => {
@@ -832,28 +448,35 @@ export default function Home() {
       margin: '0 auto',
       padding: '1rem'
     }}>
-      <h1>本地語音 AI 助手 🧠</h1>
-      
-      {/* 導航連結 */}
-      <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-        <a 
-          href="/voice-setup" 
-          style={{ 
-            color: '#007bff', 
-            textDecoration: 'none',
-            fontSize: '0.9rem',
+      {/* 導航按鈕 */}
+      <div style={{ 
+        marginBottom: '1rem', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center' 
+      }}>
+        <button
+          onClick={() => router.push('/voice-setup')}
+          style={{
             padding: '0.5rem 1rem',
-            border: '1px solid #007bff',
-            borderRadius: '4px',
-            backgroundColor: 'white'
+            fontSize: '0.9rem',
+            backgroundColor: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            alignItems: 'center',
+            gap: '0.5rem',
+            display: 'none'
           }}
         >
-          🎙️ 聲音設定
-        </a>
+          ⚙️ 語音設定
+        </button>
       </div>
       
+      <h1>手動語音 AI 助手 🎤</h1>
       <p style={{ color: '#666', marginBottom: '1rem' }}>
-        智慧對話記憶 + 真人化回應。自動校準環境音，智慧檢測語音活動。AI 會記住對話內容，回應後自動重新開始錄音。
+        點擊式語音對話模式。點擊開始錄音，再次點擊結束錄音，AI 將自動進行語音轉錄、回覆生成和語音播放。
       </p>
       
       {/* 音量監控 */}
@@ -878,76 +501,25 @@ export default function Home() {
             transition: 'all 0.1s ease'
           }} />
         </div>
-        {(isListening || isCalibrating || continuousVolumeCheckRef.current) && (
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
-            靜音閾值: {getSilenceThreshold().toFixed(1)} | 語音閾值: {getVoiceThreshold().toFixed(1)}
-            {ttsManagerRef.current && ttsManagerRef.current.isSpeaking() && (
-              <span style={{ color: '#ff5722', marginLeft: '10px' }}>
-                | 搶話閾值: {getInterruptThreshold().toFixed(1)}
-              </span>
-            )}
-            {isInterrupting && (
-              <span style={{ color: '#e91e63', marginLeft: '10px' }}>
-                🚨 正在打斷TTS
-              </span>
-            )}
-            {isSpeaking && !isInterrupting && (
-              <span style={{ color: '#9c27b0', marginLeft: '10px' }}>
-                🗣️ TTS播放中
-              </span>
-            )}
-            {!isSpeaking && isListening && (
-              <span style={{ color: '#28a745', marginLeft: '10px' }}>
-                🎤 錄音模式
-              </span>
-            )}
-            {!isSpeaking && !isListening && conversationStarted && !isCalibrating && (
-              <span style={{ color: '#007bff', marginLeft: '10px' }}>
-                {waitingForVoiceAfterTts ? '🔄 等待語音觸發錄音' : '🔊 等待語音輸入'}
-              </span>
-            )}
-            {!conversationStarted && !isCalibrating && continuousVolumeCheckRef.current && (
-              <span style={{ color: '#6c757d', marginLeft: '10px' }}>
-                📊 持續音量監測中
-              </span>
-            )}
-            {hasDetectedVoice && (
-              <span style={{ color: '#28a745', marginLeft: '10px' }}>✅ 語音已檢測</span>
-            )}
-          </div>
-        )}
+        <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
+          {isListening && (
+            <span style={{ color: '#28a745' }}>🎤 錄音中</span>
+          )}
+          {isSpeaking && !isListening && (
+            <span style={{ color: '#9c27b0' }}>🗣️ TTS播放中</span>
+          )}
+          {!isSpeaking && !isListening && conversationStarted && (
+            <span style={{ color: '#007bff' }}>🔊 等待錄音</span>
+          )}
+          {!conversationStarted && (
+            <span style={{ color: '#6c757d' }}>📊 音量監測中</span>
+          )}
+        </div>
       </div>
 
       {/* 控制按鈕 */}
       <div style={{ marginBottom: '1rem' }}>
-        {isCalibrating ? (
-          <div style={{ textAlign: 'center' }}>
-            <button
-              disabled
-              style={{
-                padding: '1rem 2rem',
-                fontSize: '1.2rem',
-                backgroundColor: '#ffc107',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'not-allowed',
-              }}
-            >
-              🔧 校準環境音中... {Math.round(calibrationProgress)}%
-            </button>
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '0.5rem', 
-              backgroundColor: '#fff3cd', 
-              borderRadius: '4px',
-              fontSize: '0.9rem',
-              color: '#856404'
-            }}>
-              請保持安靜 {Math.ceil((NOISE_CALIBRATION_CONFIG.DEFAULT_CALIBRATION_DURATION - (calibrationProgress / 100 * NOISE_CALIBRATION_CONFIG.DEFAULT_CALIBRATION_DURATION)) / 1000)} 秒，讓系統學習環境音...
-            </div>
-          </div>
-        ) : !conversationStarted ? (
+        {!conversationStarted ? (
           <button
             onClick={startConversation}
             disabled={loading}
@@ -961,28 +533,28 @@ export default function Home() {
               cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            🎙️ 校準並開始對話
+            🎙️ 開始對話
           </button>
         ) : (
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             
-            {/* 手動開始錄音按鈕 */}
-            {!isListening && !loading && !waitingForVoiceAfterTts && (
-              <button
-                onClick={startListening}
-                style={{
-                  padding: '1rem 1.5rem',
-                  fontSize: '1rem',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                🎤 開始錄音
-              </button>
-            )}
+            {/* 錄音控制按鈕 */}
+            <button
+              onClick={toggleRecording}
+              disabled={loading || isSpeaking}
+              style={{
+                padding: '1rem 1.5rem',
+                fontSize: '1.2rem',
+                backgroundColor: loading || isSpeaking ? '#6c757d' : isListening ? '#dc3545' : '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: loading || isSpeaking ? 'not-allowed' : 'pointer',
+                minWidth: '160px'
+              }}
+            >
+              {loading ? '⏳ 處理中...' : isListening ? '⏹️ 停止錄音' : '🎤 開始錄音'}
+            </button>
             
             <button
               onClick={endConversation}
@@ -1006,37 +578,38 @@ export default function Home() {
           <div style={{ 
             marginTop: '1rem', 
             padding: '0.5rem', 
-            backgroundColor: hasDetectedVoice ? '#d4edda' : '#fff3cd', 
+            backgroundColor: '#d4edda', 
             borderRadius: '4px',
             fontSize: '0.9rem',
-            color: hasDetectedVoice ? '#155724' : '#856404'
+            color: '#155724'
           }}>
-            {hasDetectedVoice 
-              ? `🟢 已檢測到語音，停止說話 ${SILENCE_DURATION/1000} 秒後會自動發送...` 
-              : `🎤 錄音模式 - 等待語音輸入...（當前音量: ${currentVolume.toFixed(1)}, 需要超過: ${getVoiceThreshold().toFixed(1)}）`
-            }
+            🎤 錄音中 - 點擊「停止錄音」按鈕結束錄音並發送...
           </div>
         )}
 
-        {conversationStarted && !isListening && !loading && (
+        {conversationStarted && !isListening && !loading && !isSpeaking && (
           <div style={{ 
             marginTop: '1rem', 
             padding: '0.5rem', 
-            backgroundColor: waitingForVoiceAfterTts ? '#fff3cd' : '#d1ecf1', 
+            backgroundColor: '#d1ecf1', 
             borderRadius: '4px',
             fontSize: '0.9rem',
-            color: waitingForVoiceAfterTts ? '#856404' : '#0c5460'
+            color: '#0c5460'
           }}>
-            {waitingForVoiceAfterTts ? (
-              <>🔄 等待語音觸發錄音... （當前音量: {currentVolume.toFixed(1)}, 需要超過: {getVoiceThreshold().toFixed(1)}）</>
-            ) : (
-              <>🔄 等待語音輸入或TTS播放...</>
-            )}
-            {isSpeaking && (
-              <span style={{ marginLeft: '10px', color: '#28a745' }}>
-                🗣️ TTS播放中
-              </span>
-            )}
+            💬 點擊「開始錄音」按鈕來錄製您的語音消息
+          </div>
+        )}
+
+        {isSpeaking && (
+          <div style={{ 
+            marginTop: '1rem', 
+            padding: '0.5rem', 
+            backgroundColor: '#e2e3e5', 
+            borderRadius: '4px',
+            fontSize: '0.9rem',
+            color: '#383d41'
+          }}>
+            🗣️ AI 正在回覆中，請等待播放完成後再錄音...
           </div>
         )}
       </div>
@@ -1054,16 +627,16 @@ export default function Home() {
         }}>
           {error.includes('未識別到有效語音') ? (
             <>
-              🎤 {error}，請重新說話...
+              🎤 {error}，請重新錄音...
               <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: 'auto' }}>
-                (2秒後自動恢復)
+                (3秒後自動清除)
               </span>
             </>
           ) : error.includes('錄音時間過短') ? (
             <>
               ⏱️ {error}
               <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: 'auto' }}>
-                (2秒後自動恢復)
+                (3秒後自動清除)
               </span>
             </>
           ) : (
@@ -1090,7 +663,7 @@ export default function Home() {
             fontStyle: 'italic',
             marginTop: '2rem'
           }}>
-            🎤 開始說話來進行對話...
+            🎤 點擊「開始錄音」按鈕來進行對話...
           </div>
         )}
 
@@ -1103,65 +676,64 @@ export default function Home() {
               marginBottom: '1rem'
             }}
           >
-                          <div
-                style={{
-                  maxWidth: '70%',
-                  padding: '1rem',
-                  borderRadius: '12px',
-                  backgroundColor: message.type === 'user' ? '#007bff' : '#e9ecef',
-                  color: message.type === 'user' ? 'white' : '#333',
-                  position: 'relative',
-                  opacity: message.isLoading ? 0.7 : 1,
-                }}
-              >
-                <div style={{ 
-                  fontSize: '0.8rem', 
-                  opacity: 0.8, 
-                  marginBottom: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <span>{message.type === 'user' ? '🗣️ 你' : '🤖 AI'}</span>
-                  <span>{formatTime(message.timestamp)}</span>
-                  {message.isLoading && <span>⏳</span>}
-                  {message.isPlaying && <span>🔊</span>}
-                  
-                  {/* AI消息的播放按鈕 */}
-                  {message.type === 'ai' && !message.isLoading && message.content.trim() && (
-                    <button
-                      onClick={() => {
-                        if (message.isPlaying) {
-                          stopSpeaking();
-                        } else {
-                          speakText(message.content, message.id);
-                        }
-                      }}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        fontSize: '0.7rem',
-                        backgroundColor: message.isPlaying ? '#dc3545' : '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        opacity: 0.8,
-                      }}
-                    >
-                      {message.isPlaying ? '🔇' : '🔊'}
-                    </button>
-                  )}
-                </div>
-                <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>
-                  {message.content}
-                </div>
+            <div
+              style={{
+                maxWidth: '70%',
+                padding: '1rem',
+                borderRadius: '12px',
+                backgroundColor: message.type === 'user' ? '#007bff' : '#e9ecef',
+                color: message.type === 'user' ? 'white' : '#333',
+                position: 'relative',
+                opacity: message.isLoading ? 0.7 : 1,
+              }}
+            >
+              <div style={{ 
+                fontSize: '0.8rem', 
+                opacity: 0.8, 
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span>{message.type === 'user' ? '🗣️ 你' : '🤖 AI'}</span>
+                <span>{formatTime(message.timestamp)}</span>
+                {message.isLoading && <span>⏳</span>}
+                {message.isPlaying && <span>🔊</span>}
+                
+                {/* AI消息的播放按鈕 */}
+                {message.type === 'ai' && !message.isLoading && message.content.trim() && (
+                  <button
+                    onClick={() => {
+                      if (message.isPlaying) {
+                        stopSpeaking();
+                      } else {
+                        speakText(message.content, message.id);
+                      }
+                    }}
+                    style={{
+                      padding: '0.2rem 0.4rem',
+                      fontSize: '0.7rem',
+                      backgroundColor: message.isPlaying ? '#dc3545' : '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      opacity: 0.8,
+                    }}
+                  >
+                    {message.isPlaying ? '🔇' : '🔊'}
+                  </button>
+                )}
               </div>
+              <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>
+                {message.content}
+              </div>
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
 
-      
       <style jsx>{`
         @keyframes pulse {
           0% { transform: scale(1); }
