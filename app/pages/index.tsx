@@ -15,6 +15,14 @@ export default function Home() {
       darkColor: '#1E40AF'
     },
     {
+      title: '模擬下屬對話機器人',
+      description: '結合 Agent 配置的智能語音對話',
+      href: '/agent-chat',
+      icon: '🤖💬',
+      color: '#6366F1',
+      darkColor: '#4338CA'
+    },
+    {
       title: 'TTS 語音對話',
       description: '包含文字轉語音功能的完整對話體驗',
       href: '/tts-speech',
@@ -30,14 +38,6 @@ export default function Home() {
     //   color: '#8B5CF6',
     //   darkColor: '#5B21B6'
     // },
-    {
-      title: 'AI Agent 對話',
-      description: '結合 Agent 配置的智能語音對話，支援自定義 AI 角色',
-      href: '/agent-chat',
-      icon: '🤖💬',
-      color: '#6366F1',
-      darkColor: '#4338CA'
-    },
     // {
     //   title: '代理配置',
     //   description: '配置 AI 代理的行為和參數',

@@ -465,7 +465,7 @@ export default function Home() {
             border: 'none',
             borderRadius: '6px',
             cursor: 'pointer',
-            display: 'flex',
+            display: 'none',
             alignItems: 'center',
             gap: '0.5rem'
           }}
@@ -506,7 +506,7 @@ export default function Home() {
             <span style={{ color: '#28a745' }}>🎤 錄音中</span>
           )}
           {isSpeaking && !isListening && (
-            <span style={{ color: '#9c27b0' }}>🗣️ TTS播放中</span>
+            <span style={{ color: '#9c27b0' }}>🗣️ TTS生成中</span>
           )}
           {!isSpeaking && !isListening && conversationStarted && (
             <span style={{ color: '#007bff' }}>🔊 等待錄音</span>
