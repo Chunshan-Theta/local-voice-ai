@@ -1,5 +1,4 @@
-import { AgentConfig } from '../types';
-import { Language } from '../utils/agentFactory';
+import { AgentConfig, Language } from '../types';
 
 /**
  * 預設的中文 GROW 教練技巧練習 Agent 配置
@@ -248,7 +247,12 @@ export const DEFAULT_ENGLISH_VOICE_ASSISTANT: AgentConfig = {
  * 根據語言獲取預設 Agent 配置
  */
 export function getDefaultAgentConfig(lang: Language): AgentConfig {
-  return lang === 'zh' ? DEFAULT_CHINESE_GROW_GIRL_AGENT : DEFAULT_ENGLISH_VOICE_ASSISTANT;
+  // 支援 zh, en，其他語言降級到英文
+  if (lang === 'zh') {
+    return DEFAULT_CHINESE_GROW_GIRL_AGENT;
+  }
+  // 對於 'en', 'es', 'fr' 或其他語言，使用英文版本
+  return DEFAULT_ENGLISH_VOICE_ASSISTANT;
 }
 
 /**

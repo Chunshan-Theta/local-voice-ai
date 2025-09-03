@@ -6,9 +6,11 @@ export {
   cloneAgentConfig,
   createAgentConfig,
   fetchAgentConfig,
-  handleApiTools,
-  type Language 
+  handleApiTools
 } from './agentFactory';
+
+// Types
+export type { Language } from '../types';
 
 // Agent configuration manager
 export { AgentConfigManager } from './agentConfigManager';

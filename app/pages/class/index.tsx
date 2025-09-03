@@ -21,10 +21,9 @@ import {
 } from '../../lib/replyManager';
 
 // Import from the existing types system
-import { AgentConfig } from "../../src/class/types";
+import { AgentConfig, Language } from "../../src/class/types";
 import { UserInfoModal, type UserInfo, ChatRoom, TopToolbar, BottomControlPanel } from "../../src/class/components";
 import { AgentConfigManager } from "../../src/class/utils/agentConfigManager";
-import { type Language } from "../../src/class/utils/agentFactory";
 
 function ClassChatPage() {
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);

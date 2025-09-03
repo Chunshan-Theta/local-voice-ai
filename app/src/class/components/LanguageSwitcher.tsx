@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Language } from '../utils/agentFactory';
+import { Language } from '../types';
 
 export interface LanguageOption {
   code: Language;
