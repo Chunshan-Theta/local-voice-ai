@@ -238,7 +238,7 @@ export default function VoiceSetup() {
         setSuccess('聲音設定成功！您現在可以開始對話了。');
         // 3秒後自動跳轉到主頁面
         setTimeout(() => {
-          router.push('/dev');
+          router.push('/tts-speech');
         }, 3000);
       } else {
         setError(result.message || '上傳失敗');

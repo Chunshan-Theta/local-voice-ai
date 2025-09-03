@@ -22,30 +22,38 @@ export default function Home() {
       color: '#10B981',
       darkColor: '#047857'
     },
+    // {
+    //   title: '語音設定',
+    //   description: '錄製語音參考樣本，提升語音合成效果',
+    //   href: '/voice-setup',
+    //   icon: '⚙️',
+    //   color: '#8B5CF6',
+    //   darkColor: '#5B21B6'
+    // },
     {
-      title: '語音設定',
-      description: '錄製語音參考樣本，提升語音合成效果',
-      href: '/voice-setup',
-      icon: '⚙️',
-      color: '#8B5CF6',
-      darkColor: '#5B21B6'
+      title: 'AI Agent 對話',
+      description: '結合 Agent 配置的智能語音對話，支援自定義 AI 角色',
+      href: '/agent-chat',
+      icon: '🤖💬',
+      color: '#6366F1',
+      darkColor: '#4338CA'
     },
-    {
-      title: '代理配置',
-      description: '配置 AI 代理的行為和參數',
-      href: '/agent-config',
-      icon: '🤖',
-      color: '#F59E0B',
-      darkColor: '#D97706'
-    },
-    {
-      title: '課堂模式',
-      description: '專為課堂環境設計的語音互動功能',
-      href: '/class',
-      icon: '🎓',
-      color: '#EF4444',
-      darkColor: '#DC2626'
-    }
+    // {
+    //   title: '代理配置',
+    //   description: '配置 AI 代理的行為和參數',
+    //   href: '/agent-config',
+    //   icon: '🤖',
+    //   color: '#F59E0B',
+    //   darkColor: '#D97706'
+    // },
+    // {
+    //   title: '課堂模式',
+    //   description: '專為課堂環境設計的語音互動功能',
+    //   href: '/class',
+    //   icon: '🎓',
+    //   color: '#EF4444',
+    //   darkColor: '#DC2626'
+    // }
   ];
 
   const containerStyle = {

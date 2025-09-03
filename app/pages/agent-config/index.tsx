@@ -507,7 +507,7 @@ function AgentConfigPage() {
                       type="text"
                       value={formData.name}
                       onChange={(e) => handleInputChange('name', e.target.value)}
-                      placeholder="例如：小禎 (Delta R&D Engineer)"
+                      placeholder="例如：🗣️ 語音: "
                       style={{
                         width: '100%',
                         padding: '10px',
