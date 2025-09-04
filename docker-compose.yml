@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.3'
 
 services:
   # Next.js Frontend Application
@@ -18,7 +18,6 @@ services:
       - TTS_API_KEY=${TTS_API_KEY}
     volumes:
       - ./app/tmp:/app/tmp
-    restart: unless-stopped
 
 
 volumes:

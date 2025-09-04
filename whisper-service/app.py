@@ -1,16 +1,15 @@
 import os
 import logging
 
-# 必須在導入 torch 之前設置 AMD GPU 環境變量
-print("Setting up AMD GPU environment before PyTorch import...")
-os.environ.setdefault('HIP_VISIBLE_DEVICES', os.environ.get('HIP_VISIBLE_DEVICES', '1'))
-os.environ.setdefault('PYTORCH_HIP_ALLOC_CONF', 'max_split_size_mb:512')
-os.environ.setdefault('HSA_OVERRIDE_GFX_VERSION', os.environ.get('HSA_OVERRIDE_GFX_VERSION', '12.0.1'))
+# 設置 NVIDIA GPU 環境變量
+print("Setting up NVIDIA GPU environment before PyTorch import...")
+os.environ.setdefault('CUDA_VISIBLE_DEVICES', os.environ.get('CUDA_VISIBLE_DEVICES', '0'))
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', os.environ.get('PYTORCH_CUDA_ALLOC_CONF', 'max_split_size_mb:512'))
 
 print(f"Environment setup:")
-print(f"  HIP_VISIBLE_DEVICES: {os.environ.get('HIP_VISIBLE_DEVICES')}")
-print(f"  HSA_OVERRIDE_GFX_VERSION: {os.environ.get('HSA_OVERRIDE_GFX_VERSION')}")
-print(f"  PYTORCH_HIP_ALLOC_CONF: {os.environ.get('PYTORCH_HIP_ALLOC_CONF')}")
+print(f"  CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
+print(f"  NVIDIA_VISIBLE_DEVICES: {os.environ.get('NVIDIA_VISIBLE_DEVICES')}")
+print(f"  PYTORCH_CUDA_ALLOC_CONF: {os.environ.get('PYTORCH_CUDA_ALLOC_CONF')}")
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -22,66 +21,40 @@ import torch
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Check GPU availability (AMD ROCm/HIP support)
+# Check GPU availability (NVIDIA CUDA support)
 def check_gpu_availability():
     print("=== GPU Detection Diagnostics ===")
     
     # Check PyTorch build info
     print(f"PyTorch version: {torch.__version__}")
-    if hasattr(torch.version, 'hip') and torch.version.hip is not None:
-        print(f"ROCm/HIP version: {torch.version.hip}")
-        print("This is a ROCm build of PyTorch")
+    if hasattr(torch.version, 'cuda') and torch.version.cuda is not None:
+        print(f"CUDA version: {torch.version.cuda}")
+        print("This is a CUDA build of PyTorch")
     else:
-        print("This appears to be a CUDA build of PyTorch")
-    
-    # Force GPU initialization
-    try:
-        # Try to force HIP/ROCm initialization
-        import subprocess
-        result = subprocess.run(['python', '-c', 'import torch; torch.cuda.init()'], 
-                              capture_output=True, text=True, timeout=10)
-        print(f"CUDA init result: {result.returncode}")
-        if result.stderr:
-            print(f"CUDA init stderr: {result.stderr}")
-    except Exception as e:
-        print(f"Failed to force CUDA init: {e}")
+        print("No CUDA support detected in PyTorch")
     
     # Check basic CUDA availability
     print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")
     print(f"torch.cuda.device_count(): {torch.cuda.device_count()}")
     
-    # Check for GPU device files
-    gpu_devices = ['/dev/kfd', '/dev/dri/card1', '/dev/dri/card2', '/dev/dri/renderD128', '/dev/dri/renderD129']
-    print("GPU device file check:")
-    for device in gpu_devices:
-        exists = os.path.exists(device)
-        if exists:
-            try:
-                stat_info = os.stat(device)
-                print(f"  {device}: EXISTS (mode: {oct(stat_info.st_mode)})")
-            except:
-                print(f"  {device}: EXISTS (stat failed)")
-        else:
-            print(f"  {device}: NOT FOUND")
-    
     # Check environment variables
     print("Environment variables:")
-    for env_var in ['HIP_VISIBLE_DEVICES', 'CUDA_VISIBLE_DEVICES', 'HSA_OVERRIDE_GFX_VERSION', 'ROC_ENABLE_PRE_VEGA']:
+    for env_var in ['CUDA_VISIBLE_DEVICES', 'NVIDIA_VISIBLE_DEVICES', 'PYTORCH_CUDA_ALLOC_CONF']:
         value = os.environ.get(env_var, 'Not set')
         print(f"  {env_var}: {value}")
     
-    # Try to manually detect GPUs using rocm-smi
+    # Try to manually detect GPUs using nvidia-smi
     try:
         import subprocess
-        result = subprocess.run(['/opt/rocm/bin/rocm-smi', '--showid'], 
+        result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total', '--format=csv,noheader'], 
                               capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
-            print("rocm-smi GPU detection:")
+            print("nvidia-smi GPU detection:")
             print(result.stdout)
         else:
-            print("rocm-smi failed:", result.stderr)
+            print("nvidia-smi failed:", result.stderr)
     except Exception as e:
-        print(f"Failed to run rocm-smi: {e}")
+        print(f"Failed to run nvidia-smi: {e}")
     
     # Try torch.cuda operations
     try:
@@ -136,9 +109,9 @@ if device == "cuda":
             props = torch.cuda.get_device_properties(current_device)
             logger.info(f"GPU: {props.name} (Memory: {props.total_memory / 1024**3:.1f} GB)")
         
-        # Check if this is ROCm/HIP
-        if hasattr(torch.version, 'hip') and torch.version.hip is not None:
-            logger.info(f"ROCm/HIP version: {torch.version.hip}")
+        # Check if this is CUDA enabled
+        if hasattr(torch.version, 'cuda') and torch.version.cuda is not None:
+            logger.info(f"CUDA version: {torch.version.cuda}")
         
     except Exception as e:
         logger.warning(f"Could not get detailed GPU info: {e}")
@@ -164,12 +137,8 @@ def health_check():
         
         # Check GPU availability more safely in multiprocessing context
         try:
-            # Check for AMD ROCm/HIP first
-            if hasattr(torch.version, 'hip') and torch.version.hip is not None:
-                gpu_available = True
-                gpu_name = f"AMD GPU with ROCm/HIP {torch.version.hip}"
-            # Then check for NVIDIA CUDA
-            elif torch.cuda.is_available():
+            # Check for NVIDIA CUDA
+            if torch.cuda.is_available():
                 gpu_available = True
                 # Only try to get GPU name if we're not in a forked subprocess
                 import multiprocessing
@@ -263,24 +232,24 @@ def transcribe_audio():
                 logger.warning(f"Failed to delete temp file: {e}")
 
 if __name__ == '__main__':
-    # 設置 AMD GPU 環境變量（這些需要在 PyTorch 初始化之前設置）
-    print("Setting up AMD GPU environment...")
-    os.environ['HIP_VISIBLE_DEVICES'] = os.environ.get('HIP_VISIBLE_DEVICES', '1')
-    os.environ['PYTORCH_HIP_ALLOC_CONF'] = 'max_split_size_mb:512'
+    # 設置 NVIDIA GPU 環境變量
+    print("Setting up NVIDIA GPU environment...")
+    os.environ['CUDA_VISIBLE_DEVICES'] = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
     
     # 顯示環境信息
     print("=== GPU Environment Information ===")
-    print(f"HIP_VISIBLE_DEVICES: {os.environ.get('HIP_VISIBLE_DEVICES', 'Not set')}")
-    print(f"ROC_VISIBLE_DEVICES: {os.environ.get('ROC_VISIBLE_DEVICES', 'Not set')}")
-    print(f"HSA_OVERRIDE_GFX_VERSION: {os.environ.get('HSA_OVERRIDE_GFX_VERSION', 'Not set')}")
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')}")
+    print(f"NVIDIA_VISIBLE_DEVICES: {os.environ.get('NVIDIA_VISIBLE_DEVICES', 'Not set')}")
+    print(f"PYTORCH_CUDA_ALLOC_CONF: {os.environ.get('PYTORCH_CUDA_ALLOC_CONF', 'Not set')}")
     
     # 檢測PyTorch和GPU
     print(f"PyTorch version: {torch.__version__}")
-    if hasattr(torch.version, 'hip') and torch.version.hip is not None:
-        print(f"ROCm/HIP version: {torch.version.hip}")
-        print("This is a ROCm build of PyTorch")
+    if hasattr(torch.version, 'cuda') and torch.version.cuda is not None:
+        print(f"CUDA version: {torch.version.cuda}")
+        print("This is a CUDA build of PyTorch")
     else:
-        print("This appears to be a CUDA build of PyTorch")
+        print("No CUDA support detected in PyTorch")
     
     print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")
     print(f"torch.cuda.device_count(): {torch.cuda.device_count()}")
