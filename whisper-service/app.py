@@ -1,20 +1,120 @@
+import os
+import logging
+
+# 設置 NVIDIA GPU 環境變量
+print("Setting up NVIDIA GPU environment before PyTorch import...")
+os.environ.setdefault('CUDA_VISIBLE_DEVICES', os.environ.get('CUDA_VISIBLE_DEVICES', '0'))
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', os.environ.get('PYTORCH_CUDA_ALLOC_CONF', 'max_split_size_mb:512'))
+
+print(f"Environment setup:")
+print(f"  CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
+print(f"  NVIDIA_VISIBLE_DEVICES: {os.environ.get('NVIDIA_VISIBLE_DEVICES')}")
+print(f"  PYTORCH_CUDA_ALLOC_CONF: {os.environ.get('PYTORCH_CUDA_ALLOC_CONF')}")
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import whisper
 import tempfile
-import os
-import logging
 import torch
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Check GPU availability
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# Check GPU availability (NVIDIA CUDA support)
+def check_gpu_availability():
+    print("=== GPU Detection Diagnostics ===")
+    
+    # Check PyTorch build info
+    print(f"PyTorch version: {torch.__version__}")
+    if hasattr(torch.version, 'cuda') and torch.version.cuda is not None:
+        print(f"CUDA version: {torch.version.cuda}")
+        print("This is a CUDA build of PyTorch")
+    else:
+        print("No CUDA support detected in PyTorch")
+    
+    # Check basic CUDA availability
+    print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")
+    print(f"torch.cuda.device_count(): {torch.cuda.device_count()}")
+    
+    # Check environment variables
+    print("Environment variables:")
+    for env_var in ['CUDA_VISIBLE_DEVICES', 'NVIDIA_VISIBLE_DEVICES', 'PYTORCH_CUDA_ALLOC_CONF']:
+        value = os.environ.get(env_var, 'Not set')
+        print(f"  {env_var}: {value}")
+    
+    # Try to manually detect GPUs using nvidia-smi
+    try:
+        import subprocess
+        result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total', '--format=csv,noheader'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            print("nvidia-smi GPU detection:")
+            print(result.stdout)
+        else:
+            print("nvidia-smi failed:", result.stderr)
+    except Exception as e:
+        print(f"Failed to run nvidia-smi: {e}")
+    
+    # Try torch.cuda operations
+    try:
+        # Check if we have any GPU devices
+        device_count = torch.cuda.device_count()
+        print(f"Final device count: {device_count}")
+        
+        if device_count > 0:
+            print(f"Found {device_count} GPU device(s)")
+            # Test if we can actually use the GPU
+            try:
+                # Create a small tensor and move it to GPU
+                test_tensor = torch.tensor([1.0], dtype=torch.float32)
+                print(f"Created test tensor: {test_tensor}")
+                
+                # Try to move to CUDA
+                gpu_tensor = test_tensor.to('cuda')
+                print(f"Successfully moved tensor to GPU: {gpu_tensor}")
+                
+                # Test a simple operation
+                result = gpu_tensor * 2
+                print(f"GPU computation result: {result}")
+                
+                logger.info(f"GPU test successful, device count: {device_count}")
+                return "cuda"
+            except Exception as gpu_test_error:
+                print(f"GPU test failed: {gpu_test_error}")
+                logger.warning(f"GPU test failed: {gpu_test_error}")
+                return "cpu"
+        else:
+            logger.info("No GPU devices found")
+            return "cpu"
+    except Exception as e:
+        print(f"GPU detection error: {e}")
+        logger.warning(f"GPU detection failed: {e}")
+        return "cpu"
+    finally:
+        print("================================")
+
+device = check_gpu_availability()
 logger.info(f"Using device: {device}")
+
 if device == "cuda":
-    logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+    try:
+        device_count = torch.cuda.device_count()
+        current_device = torch.cuda.current_device()
+        logger.info(f"GPU device count: {device_count}")
+        logger.info(f"Current GPU device: {current_device}")
+        
+        # Try to get device properties
+        if hasattr(torch.cuda, 'get_device_properties'):
+            props = torch.cuda.get_device_properties(current_device)
+            logger.info(f"GPU: {props.name} (Memory: {props.total_memory / 1024**3:.1f} GB)")
+        
+        # Check if this is CUDA enabled
+        if hasattr(torch.version, 'cuda') and torch.version.cuda is not None:
+            logger.info(f"CUDA version: {torch.version.cuda}")
+        
+    except Exception as e:
+        logger.warning(f"Could not get detailed GPU info: {e}")
 
 # Get Whisper model from environment variable
 whisper_model = os.getenv("WHISPER_MODEL", "tiny")
@@ -37,14 +137,19 @@ def health_check():
         
         # Check GPU availability more safely in multiprocessing context
         try:
-            gpu_available = torch.cuda.is_available()
-            if gpu_available:
+            # Check for NVIDIA CUDA
+            if torch.cuda.is_available():
+                gpu_available = True
                 # Only try to get GPU name if we're not in a forked subprocess
                 import multiprocessing
                 if multiprocessing.current_process().name == 'MainProcess':
                     gpu_name = torch.cuda.get_device_name(0)
                 else:
-                    gpu_name = "GPU available (name check skipped in subprocess)"
+                    gpu_name = "NVIDIA GPU available (name check skipped in subprocess)"
+            else:
+                gpu_available = False
+                gpu_name = "No GPU detected"
+                
         except RuntimeError as e:
             if "CUDA" in str(e) and "forked subprocess" in str(e):
                 logger.info("CUDA not accessible in forked subprocess - this is normal")
@@ -127,15 +232,41 @@ def transcribe_audio():
                 logger.warning(f"Failed to delete temp file: {e}")
 
 if __name__ == '__main__':
-    # 確保CUDA環境正確設置
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    # 設置 NVIDIA GPU 環境變量
+    print("Setting up NVIDIA GPU environment...")
+    os.environ['CUDA_VISIBLE_DEVICES'] = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
     
-    print(f"PyTorch CUDA available: {torch.cuda.is_available()}")
-    if torch.cuda.is_available():
-        print(f"CUDA device count: {torch.cuda.device_count()}")
-        print(f"Current CUDA device: {torch.cuda.current_device()}")
-        print(f"Device name: {torch.cuda.get_device_name(0)}")
+    # 顯示環境信息
+    print("=== GPU Environment Information ===")
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')}")
+    print(f"NVIDIA_VISIBLE_DEVICES: {os.environ.get('NVIDIA_VISIBLE_DEVICES', 'Not set')}")
+    print(f"PYTORCH_CUDA_ALLOC_CONF: {os.environ.get('PYTORCH_CUDA_ALLOC_CONF', 'Not set')}")
     
-    # 使用單進程Flask配置避免CUDA context問題
+    # 檢測PyTorch和GPU
+    print(f"PyTorch version: {torch.__version__}")
+    if hasattr(torch.version, 'cuda') and torch.version.cuda is not None:
+        print(f"CUDA version: {torch.version.cuda}")
+        print("This is a CUDA build of PyTorch")
+    else:
+        print("No CUDA support detected in PyTorch")
+    
+    print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")
+    print(f"torch.cuda.device_count(): {torch.cuda.device_count()}")
+    
+    if torch.cuda.device_count() > 0:
+        print(f"Current device: {torch.cuda.current_device()}")
+        try:
+            # Test GPU access
+            test_tensor = torch.tensor([1.0]).to('cuda')
+            print("GPU access test: PASSED")
+            del test_tensor  # Clean up
+        except Exception as e:
+            print(f"GPU access test: FAILED - {e}")
+    else:
+        print("No GPU devices detected")
+    
+    print("===================================")
+    
+    # 使用單進程Flask配置避免GPU context問題
     app.run(host='0.0.0.0', port=5001, debug=False, threaded=False, processes=1, use_reloader=False) 

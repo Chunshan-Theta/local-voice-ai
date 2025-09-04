@@ -10,7 +10,90 @@ export interface ConversationMessage {
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://site.ollama.lazyinwork.com';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:1b';
-const WHISPER_SERVICE_URL = process.env.WHISPER_SERVICE_URL || 'http://whisper-service:5001';
+const WHISPER_SERVICE_URL = process.env.WHISPER_SERVICE_URL || 'http://127.0.0.1:8000/stt';
+
+// 全局變量來緩存模型檢查結果
+let modelChecked = false;
+let modelAvailable = false;
+
+// 檢查並確保模型可用
+export async function ensureModelAvailable(): Promise<boolean> {
+  // 如果已經檢查過了，直接返回緩存結果
+  if (modelChecked) {
+    console.log(`Using cached model availability result: ${modelAvailable}`);
+    return modelAvailable;
+  }
+  
+  console.log(`Checking if model ${OLLAMA_MODEL} is available...`);
+  
+  try {
+    // 首先檢查模型是否已經存在
+    const listResponse = await axios.get(`${OLLAMA_BASE_URL}/api/tags`, {
+      timeout: 10000,
+    });
+    
+    if (listResponse.data && listResponse.data.models) {
+      const availableModels = listResponse.data.models.map((model: any) => model.name);
+      console.log('Available models:', availableModels);
+      
+      // 檢查目標模型是否在列表中
+      const modelExists = availableModels.some((modelName: string) => 
+        modelName === OLLAMA_MODEL || modelName.startsWith(OLLAMA_MODEL + ':')
+      );
+      
+      if (modelExists) {
+        console.log(`✅ Model ${OLLAMA_MODEL} is already available`);
+        modelChecked = true;
+        modelAvailable = true;
+        return true;
+      }
+      
+      console.log(`⚠️ Model ${OLLAMA_MODEL} not found, attempting to pull...`);
+      
+      // 模型不存在，嘗試拉取
+      const pullResponse = await axios.post(`${OLLAMA_BASE_URL}/api/pull`, {
+        name: OLLAMA_MODEL,
+        stream: false
+      }, {
+        timeout: 300000, // 5分鐘超時，因為拉取模型可能需要較長時間
+      });
+      
+      if (pullResponse.status === 200) {
+        console.log(`✅ Successfully pulled model ${OLLAMA_MODEL}`);
+        modelChecked = true;
+        modelAvailable = true;
+        return true;
+      } else {
+        console.error(`❌ Failed to pull model ${OLLAMA_MODEL}:`, pullResponse.data);
+        modelChecked = true;
+        modelAvailable = false;
+        return false;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking/pulling Ollama model:', error);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ECONNREFUSED') {
+        console.error('❌ Cannot connect to Ollama service. Please ensure Ollama is running.');
+      } else if (error.response) {
+        console.error(`❌ Ollama API error: ${error.response.data?.error || error.message}`);
+      } else {
+        console.error(`❌ Network error: ${error.message}`);
+      }
+    } else if (error instanceof Error) {
+      console.error(`❌ Error: ${error.message}`);
+    } else {
+      console.error('❌ Unknown error occurred');
+    }
+    
+    modelChecked = true;
+    modelAvailable = false;
+    return false;
+  }
+}
 
 // 清理回應中不適合語音發音的內容
 function cleanResponseForSpeech(text: string): string {
@@ -76,6 +159,8 @@ export async function whisperWithOllama(audioFilePath: string): Promise<string> 
       } else {
         throw new Error(`Network error: ${error.message}`);
       }
+    } else if (error instanceof Error) {
+      throw new Error(`Error: ${error.message}`);
     }
     
     throw new Error('Voice recognition failed - please check Whisper service status');
@@ -192,6 +277,8 @@ ${agentConfig.criteria ? `評估標準：${agentConfig.criteria}` : ''}`;
       } else {
         throw new Error(`網路錯誤: ${error.message}`);
       }
+    } else if (error instanceof Error) {
+      throw new Error(`錯誤: ${error.message}`);
     }
     
     throw new Error('聊天服務失敗');

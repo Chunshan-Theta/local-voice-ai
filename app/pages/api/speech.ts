@@ -27,12 +27,17 @@ export default async function handler(
     console.log(`🎯 正在調用 TTS 服務: ${ttsServiceUrl}`);
     console.log(`📝 輸入文本: ${processedInput.substring(0, 50)}${processedInput.length > 50 ? '...' : ''}`);
 
-    const response = await fetch(`${ttsServiceUrl}/audio/speech`, {
+    const ttsApiKey = process.env.TTS_API_KEY || '';
+    const response = await fetch(`${ttsServiceUrl}/v1/audio/speech`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${ttsApiKey}`
       },
-      body: JSON.stringify({ input: processedInput }),
+      body: JSON.stringify({ 
+        input: processedInput,
+        format: 'wav',
+      }),
     }).catch(error => {
       console.error(`❌ TTS 服務連接錯誤:`, error);
       throw new Error(`無法連接到 TTS 服務: ${error.message}`);
@@ -68,6 +73,58 @@ export default async function handler(
       });
     }
 
+    // 检查是否支持流式响应
+    const isStreamResponse = response.headers.get('content-type')?.includes('text/event-stream') || 
+                            response.headers.get('transfer-encoding') === 'chunked';
+
+    if (isStreamResponse && response.body) {
+      // 处理流式响应
+      console.log(`🌊 开始流式传输音频数据`);
+      
+      res.setHeader('Content-Type', 'audio/wav');
+      res.setHeader('Transfer-Encoding', 'chunked');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      
+      // 创建可读流并管道到响应
+      const reader = response.body.getReader();
+      const writableStream = new WritableStream({
+        write(chunk) {
+          res.write(chunk);
+        },
+        close() {
+          res.end();
+        },
+        abort(err) {
+          console.error('流式传输中断:', err);
+          res.end();
+        }
+      });
+      
+      try {
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            if (value && value.length > 0) {
+              res.write(value);
+            }
+          }
+          res.end();
+        };
+        
+        await pump();
+      } catch (error) {
+        console.error('流式传输错误:', error);
+        res.end();
+      }
+      
+      return;
+    }
+
+    // 如果不是流式响应，按原来的方式处理
+
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('audio/')) {
       console.error(`❌ 無效的響應類型:`, contentType);
@@ -89,7 +146,7 @@ export default async function handler(
     
     res.setHeader('Content-Type', 'audio/wav');
     res.setHeader('Content-Length', audioBuffer.byteLength);
-    res.send(Buffer.from(audioBuffer));
+    res.send(new Uint8Array(audioBuffer));
   } catch (error) {
     console.error('❌ TTS 服務錯誤:', error);
     res.status(500).json({ 

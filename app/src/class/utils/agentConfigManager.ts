@@ -1,5 +1,5 @@
-import { AgentConfig } from '../types';
-import { createExampleAgentConfig, validateAgentConfig, type Language } from './agentFactory';
+import { AgentConfig, Language } from '../types';
+import { createExampleAgentConfig, validateAgentConfig } from './agentFactory';
 
 /**
  * Agent 配置管理器
@@ -8,8 +8,12 @@ import { createExampleAgentConfig, validateAgentConfig, type Language } from './
 export class AgentConfigManager {
   private static instance: AgentConfigManager;
   private configs: Map<string, AgentConfig> = new Map();
+  private isLoaded: boolean = false;
 
-  private constructor() {}
+  private constructor() {
+    // 初始化時載入配置
+    this.loadConfigs();
+  }
 
   /**
    * 獲取單例實例
@@ -19,6 +23,59 @@ export class AgentConfigManager {
       AgentConfigManager.instance = new AgentConfigManager();
     }
     return AgentConfigManager.instance;
+  }
+
+  /**
+   * 載入配置 (異步)
+   */
+  private async loadConfigs(): Promise<void> {
+    if (this.isLoaded) return;
+    
+    try {
+      const response = await fetch('/api/agent-configs');
+      if (response.ok) {
+        const data = await response.json();
+        this.configs.clear();
+        
+        if (data.configs && Array.isArray(data.configs)) {
+          data.configs.forEach((item: { id: string; config: AgentConfig }) => {
+            this.configs.set(item.id, item.config);
+          });
+          console.log(`✅ 已從文件載入 ${data.configs.length} 個 Agent 配置`);
+        }
+      }
+    } catch (error) {
+      console.log('ℹ️ 首次使用或載入配置時發生錯誤，將使用空配置:', error);
+    }
+    
+    this.isLoaded = true;
+  }
+
+  /**
+   * 保存配置到文件 (異步)
+   */
+  private async saveToFile(): Promise<boolean> {
+    try {
+      const configs = this.getAllConfigs();
+      const response = await fetch('/api/agent-configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ configs }),
+      });
+      
+      if (response.ok) {
+        console.log('✅ 配置已保存到文件系統');
+        return true;
+      } else {
+        console.error('❌ 保存配置失敗:', await response.text());
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ 保存配置時發生錯誤:', error);
+      return false;
+    }
   }
 
   /**
@@ -43,7 +100,7 @@ export class AgentConfigManager {
    * @param id 配置 ID
    * @param config Agent 配置
    */
-  saveConfig(id: string, config: AgentConfig): boolean {
+  async saveConfig(id: string, config: AgentConfig): Promise<boolean> {
     if (!validateAgentConfig(config)) {
       console.error('❌ Agent 配置驗證失敗:', config);
       return false;
@@ -51,6 +108,9 @@ export class AgentConfigManager {
     
     this.configs.set(id, config);
     console.log(`✅ 已儲存 Agent 配置: ${id}`);
+    
+    // 自動保存到文件系統
+    await this.saveToFile();
     return true;
   }
 
@@ -67,14 +127,29 @@ export class AgentConfigManager {
    * 刪除配置
    * @param id 配置 ID
    */
-  deleteConfig(id: string): boolean {
-    return this.configs.delete(id);
+  async deleteConfig(id: string): Promise<boolean> {
+    const result = this.configs.delete(id);
+    if (result) {
+      await this.saveToFile();
+    }
+    return result;
   }
 
   /**
    * 獲取所有配置
    */
-  getAllConfigs(): Record<string, AgentConfig> {
+  getAllConfigs(): Array<{ id: string; config: AgentConfig }> {
+    const result: Array<{ id: string; config: AgentConfig }> = [];
+    this.configs.forEach((config, id) => {
+      result.push({ id, config });
+    });
+    return result;
+  }
+
+  /**
+   * 獲取所有配置（原格式）
+   */
+  getAllConfigsAsRecord(): Record<string, AgentConfig> {
     const result: Record<string, AgentConfig> = {};
     this.configs.forEach((config, id) => {
       result[id] = config;
@@ -102,16 +177,21 @@ export class AgentConfigManager {
    * 從 JSON 匯入配置
    * @param json JSON 字串
    */
-  importFromJson(json: string): boolean {
+  async importFromJson(json: string): Promise<boolean> {
     try {
       const configs = JSON.parse(json);
       let successCount = 0;
       
-      Object.entries(configs).forEach(([id, config]) => {
-        if (this.saveConfig(id, config as AgentConfig)) {
+      // 使用兼容 ES5 的語法
+      const configKeys = Object.keys(configs);
+      for (let i = 0; i < configKeys.length; i++) {
+        const id = configKeys[i];
+        const config = configs[id];
+        const success = await this.saveConfig(id, config as AgentConfig);
+        if (success) {
           successCount++;
         }
-      });
+      }
       
       console.log(`✅ 成功匯入 ${successCount} 個 Agent 配置`);
       return successCount > 0;

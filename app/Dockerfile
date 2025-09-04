@@ -1,6 +1,8 @@
 # Use official Python image with Node.js pre-installed
 FROM nikolaik/python-nodejs:python3.9-nodejs18
 
+# Install ffmpeg for audio conversion
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -18,7 +20,7 @@ COPY lib ./lib
 COPY src ./src
 COPY *.json ./
 COPY *.js ./
-COPY *.ts ./
+# COPY *.ts ./
 
 # Build the application
 RUN npm run build

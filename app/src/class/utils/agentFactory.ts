@@ -1,8 +1,5 @@
-import { AgentConfig } from '../types';
+import { AgentConfig, Language } from '../types';
 import { getDefaultAgentConfig } from '../config/';
-
-// Simple language type definition
-export type Language = 'zh' | 'en';
 
 /**
  * 創建範例 Agent 配置

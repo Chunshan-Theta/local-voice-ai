@@ -1,5 +1,3 @@
-version: '3.3'
-
 services:
   # Nginx Reverse Proxy
   nginx:
@@ -20,65 +18,72 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
   # Ollama LLM Service
   ollama-service:
-    image: ollama/ollama:latest
+    image: ollama/ollama:rocm
     container_name: model-svr-ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_MODELS=/ollama/models
-      - NVIDIA_VISIBLE_DEVICES=0
+      - HSA_OVERRIDE_GFX_VERSION=12.0.1
+      - HIP_VISIBLE_DEVICES=0
+    
     volumes:
       - ollama-storage:/ollama
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
     networks:
       - model-svr-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
-
+    devices:
+      - /dev/kfd
+      - /dev/dri
 
   # Whisper Speech-to-Text Service
   whisper-service:
     build:
       context: ./whisper-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.amd
     container_name: model-svr-whisper
     environment:
       - HF_HOME=/cache
-      - CUDA_VISIBLE_DEVICES=0
-      - NVIDIA_VISIBLE_DEVICES=1
-      - WHISPER_MODEL=medium
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - HIP_VISIBLE_DEVICES=1
+      - HSA_OVERRIDE_GFX_VERSION=12.0.1
+      - WHISPER_MODEL=small
+      - PYTORCH_HIP_ALLOC_CONF=max_split_size_mb:512
+      - ROC_ENABLE_PRE_VEGA=1
+      - GPU_DEVICE_ORDINAL=1
+      - CUDA_VISIBLE_DEVICES=1
     volumes:
       - hf-cache:/cache
       - ./whisper-service/tmp:/app/tmp
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+      - /sys/class/kfd:/sys/class/kfd:ro
+      - /sys/devices:/sys/devices:ro
     networks:
       - model-svr-network
     restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri/card1
+      - /dev/dri/card2
+      - /dev/dri/renderD128
+      - /dev/dri/renderD129
+    group_add:
+      - "44"    # video group
+      - "992"   # render group
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/status"]
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['1']
-              capabilities: [gpu]
-
+      start_period: 60s
 
 networks:
   model-svr-network:
